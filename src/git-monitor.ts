@@ -15,7 +15,7 @@ export class GitMonitor extends EventEmitter {
     this.git = git;
   }
 
-  async start(branchName: string): Promise<void> {
+  async start(_branchName: string): Promise<void> {
     this.monitoring = true;
     
     // Get initial commit hash

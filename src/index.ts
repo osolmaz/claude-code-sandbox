@@ -1,14 +1,12 @@
 import Docker from 'dockerode';
 import { simpleGit, SimpleGit } from 'simple-git';
 import chalk from 'chalk';
-import inquirer from 'inquirer';
 import { CredentialManager } from './credentials';
 import { GitMonitor } from './git-monitor';
 import { ContainerManager } from './container';
 import { UIManager } from './ui';
 import { SandboxConfig } from './types';
 import path from 'path';
-import fs from 'fs/promises';
 
 export class ClaudeSandbox {
   private docker: Docker;

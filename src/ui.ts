@@ -60,7 +60,7 @@ export class UIManager {
     return action;
   }
 
-  showSpinner(message: string): ora.Ora {
+  showSpinner(message: string): any {
     return ora(message).start();
   }
 

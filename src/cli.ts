@@ -3,7 +3,6 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { ClaudeSandbox } from './index';
 import { loadConfig } from './config';
-import path from 'path';
 
 const program = new Command();
 

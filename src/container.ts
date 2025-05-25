@@ -1,7 +1,5 @@
 import Docker from 'dockerode';
 import path from 'path';
-import fs from 'fs/promises';
-import { Readable, Writable } from 'stream';
 import { SandboxConfig, Credentials } from './types';
 
 export class ContainerManager {
@@ -84,21 +82,22 @@ fi\\n\\
 ENTRYPOINT ["/bin/bash", "-c"]
 `;
 
-    // Build image
-    const buildStream = await this.docker.buildImage({
-      context: undefined,
-      src: ['Dockerfile'],
-    }, {
+    // Build image from string
+    const tarStream = require('tar-stream');
+    const pack = tarStream.pack();
+    
+    // Add Dockerfile to tar
+    pack.entry({ name: 'Dockerfile' }, dockerfile);
+    pack.finalize();
+    
+    const buildStream = await this.docker.buildImage(pack, {
       dockerfile: 'Dockerfile',
       t: imageName,
-      buildargs: {
-        'DOCKER_CONTENT': Buffer.from(dockerfile).toString('base64'),
-      },
     });
 
     // Wait for build to complete
     await new Promise((resolve, reject) => {
-      this.docker.modem.followProgress(buildStream, (err: any, res: any) => {
+      this.docker.modem.followProgress(buildStream as any, (err: any, res: any) => {
         if (err) reject(err);
         else resolve(res);
       });
@@ -106,7 +105,6 @@ ENTRYPOINT ["/bin/bash", "-c"]
   }
 
   private async buildImage(dockerfilePath: string, imageName: string): Promise<void> {
-    const dockerfile = await fs.readFile(dockerfilePath, 'utf-8');
     const buildContext = path.dirname(dockerfilePath);
     
     const buildStream = await this.docker.buildImage({
@@ -118,7 +116,7 @@ ENTRYPOINT ["/bin/bash", "-c"]
     });
 
     await new Promise((resolve, reject) => {
-      this.docker.modem.followProgress(buildStream, (err: any, res: any) => {
+      this.docker.modem.followProgress(buildStream as any, (err: any, res: any) => {
         if (err) reject(err);
         else resolve(res);
       });
@@ -126,7 +124,7 @@ ENTRYPOINT ["/bin/bash", "-c"]
   }
 
   private async createContainer(containerConfig: any): Promise<Docker.Container> {
-    const { branchName, credentials, workDir, repoName } = containerConfig;
+    const { branchName, credentials, workDir } = containerConfig;
     
     // Prepare environment variables
     const env = this.prepareEnvironment(credentials);
@@ -269,7 +267,7 @@ ENTRYPOINT ["/bin/bash", "-c"]
   }
 
   async cleanup(): Promise<void> {
-    for (const [id, container] of this.containers) {
+    for (const [, container] of this.containers) {
       try {
         await container.stop();
         await container.remove();
