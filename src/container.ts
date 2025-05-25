@@ -1,6 +1,7 @@
 import Docker from 'dockerode';
 import path from 'path';
 import { SandboxConfig, Credentials } from './types';
+import chalk from 'chalk';
 
 export class ContainerManager {
   private docker: Docker;
@@ -28,6 +29,15 @@ export class ContainerManager {
 
   private async ensureImage(): Promise<void> {
     const imageName = this.config.dockerImage || 'claude-sandbox:latest';
+    
+    // Check if image already exists
+    try {
+      await this.docker.getImage(imageName).inspect();
+      console.log(chalk.green(`✓ Using existing image: ${imageName}`));
+      return;
+    } catch (error) {
+      console.log(chalk.blue(`Building image: ${imageName}...`));
+    }
     
     // Check if we need to build from Dockerfile
     if (this.config.dockerfile) {
@@ -71,11 +81,24 @@ WORKDIR /workspace
 
 # Create a wrapper script for git that prevents branch switching
 RUN echo '#!/bin/bash\\n\\
-if [[ "$1" == "checkout" ]] && [[ "$2" != "-b" ]]; then\\n\\
-    echo "Branch switching is disabled in claude-sandbox"\\n\\
-    exit 1\\n\\
-fi\\n\\
-/usr/bin/git "$@"' > /usr/local/bin/git && \\
+# Allow the initial branch creation\\n\\
+if [ ! -f /tmp/.branch-created ]; then\\n\\
+    /usr/bin/git "$@"\\n\\
+    if [[ "$1" == "checkout" ]] && [[ "$2" == "-b" ]]; then\\n\\
+        touch /tmp/.branch-created\\n\\
+    fi\\n\\
+else\\n\\
+    # After initial branch creation, prevent switching\\n\\
+    if [[ "$1" == "checkout" ]] && [[ "$2" != "-b" ]]; then\\n\\
+        echo "Branch switching is disabled in claude-sandbox"\\n\\
+        exit 1\\n\\
+    fi\\n\\
+    if [[ "$1" == "switch" ]]; then\\n\\
+        echo "Branch switching is disabled in claude-sandbox"\\n\\
+        exit 1\\n\\
+    fi\\n\\
+    /usr/bin/git "$@"\\n\\
+fi' > /usr/local/bin/git && \\
     chmod +x /usr/local/bin/git
 
 # Set up entrypoint
@@ -143,7 +166,7 @@ ENTRYPOINT ["/bin/bash", "-c"]
         NetworkMode: 'bridge',
       },
       WorkingDir: '/workspace',
-      Cmd: [`cd /workspace && git checkout ${branchName} && claude --dangerously-skip-permissions`],
+      Cmd: [`cd /workspace && git checkout -b ${branchName} && claude --dangerously-skip-permissions`],
       AttachStdin: true,
       AttachStdout: true,
       AttachStderr: true,

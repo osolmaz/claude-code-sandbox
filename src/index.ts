@@ -32,9 +32,9 @@ export class ClaudeSandbox {
       // Verify we're in a git repository
       await this.verifyGitRepo();
       
-      // Create new branch
-      const branchName = await this.createBranch();
-      console.log(chalk.green(`✓ Created branch: ${branchName}`));
+      // Generate branch name (but don't switch yet)
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+      const branchName = `claude/${timestamp}-${Date.now()}`;
       
       // Discover credentials
       const credentials = await this.credentialManager.discover();
@@ -74,13 +74,6 @@ export class ClaudeSandbox {
     }
   }
 
-  private async createBranch(): Promise<string> {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
-    const branchName = `claude/${timestamp}-${Date.now()}`;
-    
-    await this.git.checkout(['-b', branchName]);
-    return branchName;
-  }
 
   private async prepareContainer(branchName: string, credentials: any): Promise<any> {
     const workDir = process.cwd();

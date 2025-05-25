@@ -34,16 +34,25 @@ WORKDIR /workspace
 
 # Create a wrapper script for git that prevents branch switching
 RUN echo '#!/bin/bash\n\
-if [[ "$1" == "checkout" ]] && [[ "$2" != "-b" ]] && [[ "$*" != *"--"* ]]; then\n\
-    echo "Error: Branch switching is disabled in claude-sandbox"\n\
-    echo "You can only create new branches with git checkout -b"\n\
-    exit 1\n\
-fi\n\
-if [[ "$1" == "switch" ]]; then\n\
-    echo "Error: Branch switching is disabled in claude-sandbox"\n\
-    exit 1\n\
-fi\n\
-/usr/bin/git "$@"' > /usr/local/bin/git-wrapper && \
+# Allow the initial branch creation\n\
+if [ ! -f /tmp/.branch-created ]; then\n\
+    /usr/bin/git.real "$@"\n\
+    if [[ "$1" == "checkout" ]] && [[ "$2" == "-b" ]]; then\n\
+        touch /tmp/.branch-created\n\
+    fi\n\
+else\n\
+    # After initial branch creation, prevent switching\n\
+    if [[ "$1" == "checkout" ]] && [[ "$2" != "-b" ]] && [[ "$*" != *"--"* ]]; then\n\
+        echo "Error: Branch switching is disabled in claude-sandbox"\n\
+        echo "You can only create new branches with git checkout -b"\n\
+        exit 1\n\
+    fi\n\
+    if [[ "$1" == "switch" ]]; then\n\
+        echo "Error: Branch switching is disabled in claude-sandbox"\n\
+        exit 1\n\
+    fi\n\
+    /usr/bin/git.real "$@"\n\
+fi' > /usr/local/bin/git-wrapper && \
     chmod +x /usr/local/bin/git-wrapper && \
     mv /usr/bin/git /usr/bin/git.real && \
     ln -s /usr/local/bin/git-wrapper /usr/bin/git

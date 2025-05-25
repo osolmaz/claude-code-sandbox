@@ -28,10 +28,12 @@ Claude-sandbox is a tool that runs Claude Code as an interactive agent inside Do
   - Git configuration
 
 #### 4. **Git Workflow**
-- Container automatically starts on a new branch (never on main)
+- **IMPORTANT**: Branch switching happens INSIDE the container, not on the host
+- Host repository remains on its current branch
+- Container automatically creates and switches to a new branch internally
 - Branch naming: `claude/[timestamp]`
-- Claude can make commits but cannot switch branches
-- Git wrapper prevents branch switching operations
+- Claude can make commits but cannot switch branches after initial creation
+- Git wrapper prevents branch switching operations within container
 
 #### 5. **Change Detection & Review**
 - Real-time monitoring for new commits
