@@ -1,5 +1,5 @@
 {
-  "name": "claude-sandbox",
+  "name": "claude-code-sandbox",
   "version": "0.1.0",
   "description": "Run Claude Code as an autonomous agent in Docker containers with git integration",
   "main": "dist/index.js",

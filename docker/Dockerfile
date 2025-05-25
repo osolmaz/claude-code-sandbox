@@ -43,12 +43,12 @@ if [ ! -f /tmp/.branch-created ]; then\n\
 else\n\
     # After initial branch creation, prevent switching\n\
     if [[ "$1" == "checkout" ]] && [[ "$2" != "-b" ]] && [[ "$*" != *"--"* ]]; then\n\
-        echo "Error: Branch switching is disabled in claude-sandbox"\n\
+        echo "Error: Branch switching is disabled in claude-code-sandbox"\n\
         echo "You can only create new branches with git checkout -b"\n\
         exit 1\n\
     fi\n\
     if [[ "$1" == "switch" ]]; then\n\
-        echo "Error: Branch switching is disabled in claude-sandbox"\n\
+        echo "Error: Branch switching is disabled in claude-code-sandbox"\n\
         exit 1\n\
     fi\n\
     /usr/bin/git.real "$@"\n\

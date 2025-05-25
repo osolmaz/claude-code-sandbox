@@ -1,5 +1,5 @@
 {
-  "dockerImage": "claude-sandbox:latest",
+  "dockerImage": "claude-code-sandbox:latest",
   "dockerfile": null,
   "detached": false,
   "autoPush": true,

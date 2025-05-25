@@ -64,7 +64,7 @@ Create a `claude-sandbox.config.json` file:
 
 ```json
 {
-  "dockerImage": "claude-sandbox:latest",
+  "dockerImage": "claude-code-sandbox:latest",
   "dockerfile": "./custom.Dockerfile",
   "detached": false,
   "autoPush": true,
@@ -147,7 +147,7 @@ The default Docker image includes:
 Create a custom environment:
 
 ```dockerfile
-FROM claude-sandbox:latest
+FROM claude-code-sandbox:latest
 
 # Add your tools
 RUN apt-get update && apt-get install -y \

@@ -52,7 +52,7 @@ export class UIManager {
           { name: 'Continue working', value: 'nothing' },
           { name: 'Push branch to remote', value: 'push' },
           { name: 'Push branch and create PR', value: 'push-pr' },
-          { name: 'Exit claude-sandbox', value: 'exit' },
+          { name: 'Exit claude-code-sandbox', value: 'exit' },
         ],
       },
     ]);

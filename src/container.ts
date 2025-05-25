@@ -28,7 +28,7 @@ export class ContainerManager {
   }
 
   private async ensureImage(): Promise<void> {
-    const imageName = this.config.dockerImage || 'claude-sandbox:latest';
+    const imageName = this.config.dockerImage || 'claude-code-sandbox:latest';
     
     // Check if image already exists
     try {
@@ -90,11 +90,11 @@ if [ ! -f /tmp/.branch-created ]; then\\n\\
 else\\n\\
     # After initial branch creation, prevent switching\\n\\
     if [[ "$1" == "checkout" ]] && [[ "$2" != "-b" ]]; then\\n\\
-        echo "Branch switching is disabled in claude-sandbox"\\n\\
+        echo "Branch switching is disabled in claude-code-sandbox"\\n\\
         exit 1\\n\\
     fi\\n\\
     if [[ "$1" == "switch" ]]; then\\n\\
-        echo "Branch switching is disabled in claude-sandbox"\\n\\
+        echo "Branch switching is disabled in claude-code-sandbox"\\n\\
         exit 1\\n\\
     fi\\n\\
     /usr/bin/git "$@"\\n\\
@@ -110,11 +110,21 @@ ENTRYPOINT ["/bin/bash", "-c"]
     const pack = tarStream.pack();
     
     // Add Dockerfile to tar
-    pack.entry({ name: 'Dockerfile' }, dockerfile);
-    pack.finalize();
+    pack.entry({ name: 'Dockerfile' }, dockerfile, (err: any) => {
+      if (err) throw err;
+      pack.finalize();
+    });
     
-    const buildStream = await this.docker.buildImage(pack, {
-      dockerfile: 'Dockerfile',
+    // Convert to buffer for docker
+    const chunks: Buffer[] = [];
+    pack.on('data', (chunk: any) => chunks.push(chunk));
+    
+    await new Promise((resolve) => {
+      pack.on('end', resolve);
+    });
+    
+    const tarBuffer = Buffer.concat(chunks);
+    const buildStream = await this.docker.buildImage(tarBuffer as any, {
       t: imageName,
     });
 
@@ -123,6 +133,10 @@ ENTRYPOINT ["/bin/bash", "-c"]
       this.docker.modem.followProgress(buildStream as any, (err: any, res: any) => {
         if (err) reject(err);
         else resolve(res);
+      }, (event: any) => {
+        if (event.stream) {
+          process.stdout.write(event.stream);
+        }
       });
     });
   }
@@ -142,6 +156,10 @@ ENTRYPOINT ["/bin/bash", "-c"]
       this.docker.modem.followProgress(buildStream as any, (err: any, res: any) => {
         if (err) reject(err);
         else resolve(res);
+      }, (event: any) => {
+        if (event.stream) {
+          process.stdout.write(event.stream);
+        }
       });
     });
   }
@@ -157,8 +175,8 @@ ENTRYPOINT ["/bin/bash", "-c"]
     
     // Create container
     const container = await this.docker.createContainer({
-      Image: this.config.dockerImage || 'claude-sandbox:latest',
-      name: `${this.config.containerPrefix || 'claude-sandbox'}-${Date.now()}`,
+      Image: this.config.dockerImage || 'claude-code-sandbox:latest',
+      name: `${this.config.containerPrefix || 'claude-code-sandbox'}-${Date.now()}`,
       Env: env,
       HostConfig: {
         Binds: volumes,

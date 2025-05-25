@@ -3,7 +3,7 @@ import path from 'path';
 import { SandboxConfig } from './types';
 
 const DEFAULT_CONFIG: SandboxConfig = {
-  dockerImage: 'claude-sandbox:latest',
+  dockerImage: 'claude-code-sandbox:latest',
   detached: false,
   autoPush: true,
   autoCreatePR: true,
