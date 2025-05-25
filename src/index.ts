@@ -32,9 +32,14 @@ export class ClaudeSandbox {
       // Verify we're in a git repository
       await this.verifyGitRepo();
       
+      // Check current branch
+      const currentBranch = await this.git.branchLocal();
+      console.log(chalk.blue(`Current branch: ${currentBranch.current}`));
+      
       // Generate branch name (but don't switch yet)
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
       const branchName = `claude/${timestamp}-${Date.now()}`;
+      console.log(chalk.blue(`Will create branch in container: ${branchName}`));
       
       // Discover credentials
       const credentials = await this.credentialManager.discover();

@@ -22,6 +22,11 @@ export class GitMonitor extends EventEmitter {
     const log = await this.git.log({ maxCount: 1 });
     this.lastCommitHash = log.latest?.hash || '';
     
+    // Only watch if we're monitoring the host (for now we'll disable this)
+    // TODO: This should watch the container's git directory instead
+    console.log('Note: Git monitoring is currently disabled for container isolation');
+    return;
+    
     // Watch .git directory for changes
     const gitDir = path.join(process.cwd(), '.git');
     this.watcher = chokidar.watch(gitDir, {
@@ -30,7 +35,7 @@ export class GitMonitor extends EventEmitter {
       depth: 2,
     });
     
-    this.watcher.on('change', async (filepath) => {
+    this.watcher!.on('change', async (filepath) => {
       if (!this.monitoring) return;
       
       // Check if there's a new commit

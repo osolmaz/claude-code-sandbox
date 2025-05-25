@@ -23,6 +23,15 @@ export class ContainerManager {
     
     // Start container
     await container.start();
+    console.log(chalk.green('✓ Container started successfully'));
+    
+    // Copy working directory into container
+    console.log(chalk.blue('Copying files into container...'));
+    await this.copyWorkingDirectory(container, containerConfig.workDir);
+    console.log(chalk.green('✓ Files copied successfully'));
+    
+    // Give the container a moment to initialize
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     return container.id;
   }
@@ -188,7 +197,7 @@ ENTRYPOINT ["/bin/bash", "-c"]
         NetworkMode: 'bridge',
       },
       WorkingDir: '/workspace',
-      Cmd: [`cd /workspace && git checkout -b ${branchName} && claude --dangerously-skip-permissions`],
+      Cmd: [`cd /workspace && git checkout -b ${branchName} && exec claude --dangerously-skip-permissions`],
       AttachStdin: true,
       AttachStdout: true,
       AttachStderr: true,
@@ -247,10 +256,9 @@ ENTRYPOINT ["/bin/bash", "-c"]
     return env;
   }
 
-  private prepareVolumes(workDir: string, credentials: Credentials): string[] {
-    const volumes = [
-      `${workDir}:/workspace:rw`,
-    ];
+  private prepareVolumes(_workDir: string, credentials: Credentials): string[] {
+    // NO LONGER mounting the work directory - we'll copy files instead
+    const volumes: string[] = [];
     
     // Mount SSH keys if available
     if (credentials.github?.sshKey) {
@@ -276,39 +284,162 @@ ENTRYPOINT ["/bin/bash", "-c"]
       throw new Error('Container not found');
     }
     
-    const stream = await container.attach({
-      stream: true,
-      stdin: true,
-      stdout: true,
-      stderr: true,
-    });
+    console.log(chalk.blue('Attaching to container...'));
     
-    // Handle terminal resize
-    process.stdout.on('resize', () => {
-      container.resize({
-        w: process.stdout.columns,
-        h: process.stdout.rows,
+    // Check container status first
+    const info = await container.inspect();
+    console.log(chalk.blue(`Container state: Running=${info.State.Running}, Status=${info.State.Status}`));
+    
+    try {
+      const stream = await container.attach({
+        stream: true,
+        stdin: true,
+        stdout: true,
+        stderr: true,
       });
-    });
+      
+      // Set initial size
+      await container.resize({
+        w: process.stdout.columns || 80,
+        h: process.stdout.rows || 24,
+      }).catch(() => {}); // Ignore resize errors
+      
+      // Handle terminal resize
+      process.stdout.on('resize', () => {
+        container.resize({
+          w: process.stdout.columns,
+          h: process.stdout.rows,
+        }).catch(() => {}); // Ignore resize errors
+      });
+      
+      // Connect streams
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(true);
+      }
+      process.stdin.resume();
+      
+      // Use Docker's demux for proper stream handling
+      container.modem.demuxStream(stream, process.stdout, process.stderr);
+      
+      // Connect stdin
+      process.stdin.pipe(stream);
+      
+      // Handle exit
+      stream.on('end', async () => {
+        console.log(chalk.yellow('\nContainer stream ended'));
+        
+        // Get container logs to see what happened
+        try {
+          const logs = await container.logs({ stdout: true, stderr: true, tail: 50 });
+          console.log(chalk.yellow('Container logs:'));
+          console.log(logs.toString());
+        } catch (e) {
+          // Ignore
+        }
+        
+        if (process.stdin.isTTY) {
+          process.stdin.setRawMode(false);
+        }
+        process.stdin.pause();
+        process.exit(0);
+      });
+      
+      stream.on('error', (err: Error) => {
+        console.error(chalk.red('Stream error:'), err);
+      });
+      
+    } catch (error) {
+      console.error(chalk.red('Failed to attach to container:'), error);
+      throw error;
+    }
+  }
+
+  private async copyWorkingDirectory(container: Docker.Container, workDir: string): Promise<void> {
+    const { execSync } = require('child_process');
+    const fs = require('fs');
     
-    // Set initial size
-    container.resize({
-      w: process.stdout.columns || 80,
-      h: process.stdout.rows || 24,
-    });
-    
-    // Connect streams
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
-    process.stdin.pipe(stream);
-    
-    container.modem.demuxStream(stream, process.stdout, process.stderr);
-    
-    // Handle exit
-    stream.on('end', () => {
-      process.stdin.setRawMode(false);
-      process.stdin.pause();
-    });
+    try {
+      // Get list of git-tracked files (including uncommitted changes)
+      const trackedFiles = execSync('git ls-files', {
+        cwd: workDir,
+        encoding: 'utf-8'
+      }).trim().split('\n').filter((f: string) => f);
+      
+      // Get list of untracked files that aren't ignored
+      const untrackedFiles = execSync('git ls-files --others --exclude-standard', {
+        cwd: workDir,
+        encoding: 'utf-8'
+      }).trim().split('\n').filter((f: string) => f);
+      
+      // Combine all files
+      const allFiles = [...trackedFiles, ...untrackedFiles];
+      
+      console.log(chalk.blue(`Copying ${allFiles.length} files...`));
+      
+      // Create tar archive using git archive for tracked files + untracked files
+      const tarFile = `/tmp/claude-sandbox-${Date.now()}.tar`;
+      
+      // First create archive of tracked files using git archive
+      execSync(`git archive --format=tar -o "${tarFile}" HEAD`, {
+        cwd: workDir,
+        stdio: 'pipe'
+      });
+      
+      // Add untracked files if any
+      if (untrackedFiles.length > 0) {
+        // Create a file list for tar
+        const fileListPath = `/tmp/claude-sandbox-files-${Date.now()}.txt`;
+        fs.writeFileSync(fileListPath, untrackedFiles.join('\n'));
+        
+        // Append untracked files to the tar
+        execSync(`tar -rf "${tarFile}" --files-from="${fileListPath}"`, {
+          cwd: workDir,
+          stdio: 'pipe'
+        });
+        
+        fs.unlinkSync(fileListPath);
+      }
+      
+      // Read and copy the tar file in chunks to avoid memory issues
+      const stream = fs.createReadStream(tarFile);
+      
+      // Copy to container
+      await container.putArchive(stream, {
+        path: '/workspace'
+      });
+      
+      // Wait for stream to finish
+      await new Promise((resolve, reject) => {
+        stream.on('end', resolve);
+        stream.on('error', reject);
+      });
+      
+      // Clean up
+      fs.unlinkSync(tarFile);
+      
+      // Also copy .git directory to preserve git history
+      const gitTarFile = `/tmp/claude-sandbox-git-${Date.now()}.tar`;
+      execSync(`tar -cf "${gitTarFile}" .git`, {
+        cwd: workDir,
+        stdio: 'pipe'
+      });
+      
+      const gitStream = fs.createReadStream(gitTarFile);
+      await container.putArchive(gitStream, {
+        path: '/workspace'
+      });
+      
+      await new Promise((resolve, reject) => {
+        gitStream.on('end', resolve);
+        gitStream.on('error', reject);
+      });
+      
+      fs.unlinkSync(gitTarFile);
+      
+    } catch (error) {
+      console.error(chalk.red('Failed to copy files:'), error);
+      throw error;
+    }
   }
 
   async cleanup(): Promise<void> {
