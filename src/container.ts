@@ -57,14 +57,18 @@ RUN apt-get update && apt-get install -y \\
     curl \\
     git \\
     openssh-client \\
-    nodejs \\
-    npm \\
     python3 \\
     python3-pip \\
     build-essential \\
     sudo \\
     vim \\
+    ca-certificates \\
+    gnupg \\
     && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 20.x
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \\
+    && apt-get install -y nodejs
 
 # Install GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \\
@@ -73,7 +77,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | s
     && apt-get install -y gh
 
 # Install Claude Code
-RUN npm install -g claude-code@latest
+RUN npm install -g @anthropic-ai/claude-code@latest
 
 # Create workspace directory
 RUN mkdir -p /workspace
