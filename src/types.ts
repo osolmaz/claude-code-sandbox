@@ -1,0 +1,35 @@
+export interface SandboxConfig {
+  dockerImage?: string;
+  dockerfile?: string;
+  detached?: boolean;
+  containerPrefix?: string;
+  autoPush?: boolean;
+  autoCreatePR?: boolean;
+  environment?: Record<string, string>;
+  volumes?: string[];
+  allowedTools?: string[];
+  maxThinkingTokens?: number;
+  bashTimeout?: number;
+}
+
+export interface Credentials {
+  claude?: {
+    type: 'api_key' | 'oauth' | 'bedrock' | 'vertex';
+    value: string;
+    region?: string;
+    project?: string;
+  };
+  github?: {
+    token?: string;
+    sshKey?: string;
+    gitConfig?: string;
+  };
+}
+
+export interface CommitInfo {
+  hash: string;
+  author: string;
+  date: string;
+  message: string;
+  files: string[];
+}

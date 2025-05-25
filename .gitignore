@@ -1,1 +1,9 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+claude-sandbox.config.json
+!claude-sandbox.config.example.json
 reference-repos/

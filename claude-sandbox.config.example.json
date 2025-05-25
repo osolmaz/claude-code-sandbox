@@ -1,0 +1,14 @@
+{
+  "dockerImage": "claude-sandbox:latest",
+  "dockerfile": null,
+  "detached": false,
+  "autoPush": true,
+  "autoCreatePR": true,
+  "environment": {
+    "NODE_ENV": "development"
+  },
+  "volumes": [],
+  "allowedTools": ["*"],
+  "maxThinkingTokens": 100000,
+  "bashTimeout": 600000
+}
