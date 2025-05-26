@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import { SandboxConfig } from './types';
 
 const DEFAULT_CONFIG: SandboxConfig = {
@@ -8,6 +9,7 @@ const DEFAULT_CONFIG: SandboxConfig = {
   autoPush: true,
   autoCreatePR: true,
   autoStartClaude: true,
+  claudeConfigPath: path.join(os.homedir(), '.claude.json'),
   allowedTools: ['*'], // All tools allowed in sandbox
   maxThinkingTokens: 100000,
   bashTimeout: 600000, // 10 minutes

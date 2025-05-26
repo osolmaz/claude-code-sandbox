@@ -30,6 +30,10 @@ export class ContainerManager {
     try {
       await this._copyWorkingDirectory(container, containerConfig.workDir);
       console.log(chalk.green('✓ Files copied successfully'));
+
+      // Copy Claude configuration if it exists
+      await this._copyClaudeConfig(container);
+
     } catch (error) {
       console.error(chalk.red('File copy failed:'), error);
       // Clean up container on failure
@@ -232,7 +236,7 @@ ENTRYPOINT ["/bin/bash", "-c"]
   private prepareEnvironment(credentials: Credentials): string[] {
     const env = [];
 
-    // Claude credentials
+    // Claude credentials from discovery
     if (credentials.claude) {
       switch (credentials.claude.type) {
         case 'api_key':
@@ -251,6 +255,9 @@ ENTRYPOINT ["/bin/bash", "-c"]
           }
           break;
       }
+    } else if (process.env.ANTHROPIC_API_KEY) {
+      // If no Claude credentials were discovered but ANTHROPIC_API_KEY is in environment, pass it through
+      env.push(`ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY}`);
     }
 
     // GitHub token
@@ -595,6 +602,65 @@ exec /bin/bash`;
     } catch (error) {
       console.error(chalk.red('Failed to copy files:'), error);
       throw error;
+    }
+  }
+
+  private async _copyClaudeConfig(container: Docker.Container): Promise<void> {
+    const fs = require('fs');
+
+    if (!this.config.claudeConfigPath) {
+      return;
+    }
+
+    try {
+      // Check if the Claude config file exists
+      if (!fs.existsSync(this.config.claudeConfigPath)) {
+        console.log(chalk.yellow(`Claude config not found at ${this.config.claudeConfigPath}, skipping...`));
+        return;
+      }
+
+      console.log(chalk.blue('Copying Claude configuration...'));
+
+      // Read the Claude config file
+      const configContent = fs.readFileSync(this.config.claudeConfigPath, 'utf-8');
+
+      // Create a temporary tar file with the Claude config
+      const tarFile = `/tmp/claude-config-${Date.now()}.tar`;
+      const tarStream = require('tar-stream');
+      const pack = tarStream.pack();
+
+      // Add the .claude.json file to the tar
+      pack.entry({ name: '.claude.json', mode: 0o600 }, configContent, (err: any) => {
+        if (err) throw err;
+        pack.finalize();
+      });
+
+      // Write the tar to a file
+      const chunks: Buffer[] = [];
+      pack.on('data', (chunk: any) => chunks.push(chunk));
+
+      await new Promise<void>((resolve, reject) => {
+        pack.on('end', () => {
+          fs.writeFileSync(tarFile, Buffer.concat(chunks));
+          resolve();
+        });
+        pack.on('error', reject);
+      });
+
+      // Copy the tar file to the container's root home directory
+      const stream = fs.createReadStream(tarFile);
+      await container.putArchive(stream, {
+        path: '/root'  // Copy to root's home directory
+      });
+
+      // Clean up
+      fs.unlinkSync(tarFile);
+
+      console.log(chalk.green('✓ Claude configuration copied successfully'));
+
+    } catch (error) {
+      console.error(chalk.yellow('Warning: Failed to copy Claude configuration:'), error);
+      // Don't throw - this is not critical for container operation
     }
   }
 

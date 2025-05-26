@@ -41,9 +41,8 @@ export class ClaudeSandbox {
       const branchName = `claude/${timestamp}-${Date.now()}`;
       console.log(chalk.blue(`Will create branch in container: ${branchName}`));
 
-      // Discover credentials
+      // Discover credentials (optional - don't fail if not found)
       const credentials = await this.credentialManager.discover();
-      console.log(chalk.green('✓ Discovered credentials'));
 
       // Prepare container environment
       const containerConfig = await this.prepareContainer(branchName, credentials);

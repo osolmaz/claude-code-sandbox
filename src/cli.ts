@@ -13,6 +13,7 @@ program
   .option('-c, --config <path>', 'Path to configuration file', './claude-sandbox.config.json')
   .option('-d, --detached', 'Run in detached mode (container runs in background)', false)
   .option('-n, --name <name>', 'Container name prefix')
+  .option('--claude-config <path>', 'Path to Claude configuration file (default: ~/.claude.json)')
   .option('--no-push', 'Disable automatic branch pushing')
   .option('--no-pr', 'Disable automatic PR creation')
   .option('--no-auto-claude', 'Disable automatic Claude Code startup', false)
@@ -25,6 +26,7 @@ program
         ...config,
         detached: options.detached,
         containerPrefix: options.name,
+        claudeConfigPath: options.claudeConfig || config.claudeConfigPath,
         autoPush: options.push,
         autoCreatePR: options.pr,
         autoStartClaude: !options.noAutoClaude,
