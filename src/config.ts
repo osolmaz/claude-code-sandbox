@@ -11,8 +11,8 @@ const DEFAULT_CONFIG: SandboxConfig = {
   autoStartClaude: true,
   claudeConfigPath: path.join(os.homedir(), '.claude.json'),
   allowedTools: ['*'], // All tools allowed in sandbox
-  maxThinkingTokens: 100000,
-  bashTimeout: 600000, // 10 minutes
+  // maxThinkingTokens: 100000,
+  // bashTimeout: 600000, // 10 minutes
 };
 
 export async function loadConfig(configPath: string): Promise<SandboxConfig> {

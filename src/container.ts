@@ -666,6 +666,70 @@ exec /bin/bash`;
     const { execSync } = require("child_process");
 
     try {
+      // First, try to get credentials from macOS Keychain if on Mac
+      if (process.platform === "darwin") {
+        try {
+          console.log(chalk.blue("Checking macOS Keychain for Claude credentials..."));
+          const keychainCreds = execSync('security find-generic-password -s "Claude Code-credentials" -w', {
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"], // Suppress stderr
+          }).trim();
+
+          if (keychainCreds) {
+            console.log(chalk.green("✓ Found Claude credentials in macOS Keychain"));
+
+            // Create .claude directory structure
+            const claudeDirTar = `/tmp/claude-keychain-${Date.now()}.tar`;
+            const tarStream = require("tar-stream");
+            const pack = tarStream.pack();
+
+            // Add .credentials.json to the tar
+            pack.entry(
+              { name: ".claude/.credentials.json", mode: 0o600 },
+              keychainCreds,
+              (err: any) => {
+                if (err) throw err;
+                pack.finalize();
+              }
+            );
+
+            const chunks: Buffer[] = [];
+            pack.on("data", (chunk: any) => chunks.push(chunk));
+
+            await new Promise<void>((resolve, reject) => {
+              pack.on("end", () => {
+                fs.writeFileSync(claudeDirTar, Buffer.concat(chunks));
+                resolve();
+              });
+              pack.on("error", reject);
+            });
+
+            const stream = fs.createReadStream(claudeDirTar);
+            await container.putArchive(stream, {
+              path: "/home/claude",
+            });
+
+            fs.unlinkSync(claudeDirTar);
+
+            // Fix permissions
+            await container.exec({
+              Cmd: [
+                "/bin/bash",
+                "-c",
+                "sudo mkdir -p /home/claude/.claude && sudo chown -R claude:claude /home/claude/.claude && sudo chmod 700 /home/claude/.claude && sudo chmod 600 /home/claude/.claude/.credentials.json",
+              ],
+              AttachStdout: false,
+              AttachStderr: false,
+            }).then((exec) => exec.start({}));
+
+            console.log(chalk.green("✓ Claude Keychain credentials copied to container"));
+          }
+        } catch (error) {
+          // Keychain access failed or credentials not found - not critical
+          console.log(chalk.yellow("No Claude credentials found in macOS Keychain"));
+        }
+      }
+
       // Copy .claude.json if it exists
       const claudeJsonPath = path.join(os.homedir(), ".claude.json");
       if (fs.existsSync(claudeJsonPath)) {
@@ -707,9 +771,9 @@ exec /bin/bash`;
         }).then(exec => exec.start({}));
       }
 
-      // Copy .claude directory if it exists
+      // Copy .claude directory if it exists (but skip if we already copied from Keychain)
       const claudeDir = path.join(os.homedir(), ".claude");
-      if (fs.existsSync(claudeDir) && fs.statSync(claudeDir).isDirectory()) {
+      if (fs.existsSync(claudeDir) && fs.statSync(claudeDir).isDirectory() && process.platform !== "darwin") {
         console.log(chalk.blue("Copying .claude directory..."));
 
         const tarFile = `/tmp/claude-dir-${Date.now()}.tar`;
