@@ -315,7 +315,7 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
   }
 
   private prepareVolumes(_workDir: string, credentials: Credentials): string[] {
-    // NO MOUNTING - we'll copy files instead
+    // NO MOUNTING workspace - we'll copy files instead
     const volumes: string[] = [];
 
     // Mount SSH keys if available
@@ -661,85 +661,80 @@ exec /bin/bash`;
 
   private async _copyClaudeConfig(container: Docker.Container): Promise<void> {
     const fs = require("fs");
-
-    if (!this.config.claudeConfigPath) {
-      return;
-    }
+    const os = require("os");
+    const path = require("path");
+    const { execSync } = require("child_process");
 
     try {
-      // Check if the Claude config file exists
-      if (!fs.existsSync(this.config.claudeConfigPath)) {
-        console.log(
-          chalk.yellow(
-            `Claude config not found at ${this.config.claudeConfigPath}, skipping...`
-          )
-        );
-        return;
-      }
+      // Copy .claude.json if it exists
+      const claudeJsonPath = path.join(os.homedir(), ".claude.json");
+      if (fs.existsSync(claudeJsonPath)) {
+        console.log(chalk.blue("Copying .claude.json..."));
 
-      console.log(chalk.blue("Copying Claude configuration..."));
+        const configContent = fs.readFileSync(claudeJsonPath, "utf-8");
+        const tarFile = `/tmp/claude-json-${Date.now()}.tar`;
+        const tarStream = require("tar-stream");
+        const pack = tarStream.pack();
 
-      // Read the Claude config file
-      const configContent = fs.readFileSync(
-        this.config.claudeConfigPath,
-        "utf-8"
-      );
-
-      // Create a temporary tar file with the Claude config
-      const tarFile = `/tmp/claude-config-${Date.now()}.tar`;
-      const tarStream = require("tar-stream");
-      const pack = tarStream.pack();
-
-      // Add the .claude.json file to the tar
-      pack.entry(
-        { name: ".claude.json", mode: 0o600 },
-        configContent,
-        (err: any) => {
+        pack.entry({ name: ".claude.json", mode: 0o644 }, configContent, (err: any) => {
           if (err) throw err;
           pack.finalize();
-        }
-      );
-
-      // Write the tar to a file
-      const chunks: Buffer[] = [];
-      pack.on("data", (chunk: any) => chunks.push(chunk));
-
-      await new Promise<void>((resolve, reject) => {
-        pack.on("end", () => {
-          fs.writeFileSync(tarFile, Buffer.concat(chunks));
-          resolve();
         });
-        pack.on("error", reject);
-      });
 
-      // Copy the tar file to the container's claude user home directory
-      const stream = fs.createReadStream(tarFile);
-      await container.putArchive(stream, {
-        path: "/home/claude", // Copy to claude user's home directory
-      });
+        const chunks: Buffer[] = [];
+        pack.on("data", (chunk: any) => chunks.push(chunk));
 
-      // Clean up
-      fs.unlinkSync(tarFile);
+        await new Promise<void>((resolve, reject) => {
+          pack.on("end", () => {
+            fs.writeFileSync(tarFile, Buffer.concat(chunks));
+            resolve();
+          });
+          pack.on("error", reject);
+        });
 
-      // Fix permissions on the copied file
-      const fixPermsExec = await container.exec({
-        Cmd: [
-          "/bin/bash",
-          "-c",
-          "sudo chown claude:claude /home/claude/.claude.json && chmod 600 /home/claude/.claude.json",
-        ],
-        AttachStdout: false,
-        AttachStderr: false,
-      });
+        const stream = fs.createReadStream(tarFile);
+        await container.putArchive(stream, {
+          path: "/home/claude",
+        });
 
-      await fixPermsExec.start({});
+        fs.unlinkSync(tarFile);
+
+        // Fix permissions
+        await container.exec({
+          Cmd: ["/bin/bash", "-c", "sudo chown claude:claude /home/claude/.claude.json && chmod 644 /home/claude/.claude.json"],
+          AttachStdout: false,
+          AttachStderr: false,
+        }).then(exec => exec.start({}));
+      }
+
+      // Copy .claude directory if it exists
+      const claudeDir = path.join(os.homedir(), ".claude");
+      if (fs.existsSync(claudeDir) && fs.statSync(claudeDir).isDirectory()) {
+        console.log(chalk.blue("Copying .claude directory..."));
+
+        const tarFile = `/tmp/claude-dir-${Date.now()}.tar`;
+        execSync(`tar -cf "${tarFile}" -C "${os.homedir()}" .claude`, {
+          stdio: "pipe",
+        });
+
+        const stream = fs.createReadStream(tarFile);
+        await container.putArchive(stream, {
+          path: "/home/claude",
+        });
+
+        fs.unlinkSync(tarFile);
+
+        // Fix permissions recursively
+        await container.exec({
+          Cmd: ["/bin/bash", "-c", "sudo chown -R claude:claude /home/claude/.claude && chmod -R 755 /home/claude/.claude"],
+          AttachStdout: false,
+          AttachStderr: false,
+        }).then(exec => exec.start({}));
+      }
 
       console.log(chalk.green("✓ Claude configuration copied successfully"));
     } catch (error) {
-      console.error(
-        chalk.yellow("Warning: Failed to copy Claude configuration:"),
-        error
-      );
+      console.error(chalk.yellow("Warning: Failed to copy Claude configuration:"), error);
       // Don't throw - this is not critical for container operation
     }
   }
