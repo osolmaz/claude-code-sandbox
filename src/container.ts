@@ -290,9 +290,30 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
       env.push(`ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY}`);
     }
 
-    // GitHub token
+    // GitHub token - check multiple sources
     if (credentials.github?.token) {
       env.push(`GITHUB_TOKEN=${credentials.github.token}`);
+    } else if (process.env.GITHUB_TOKEN) {
+      // Pass through from environment
+      env.push(`GITHUB_TOKEN=${process.env.GITHUB_TOKEN}`);
+    } else if (process.env.GH_TOKEN) {
+      // GitHub CLI uses GH_TOKEN
+      env.push(`GITHUB_TOKEN=${process.env.GH_TOKEN}`);
+      env.push(`GH_TOKEN=${process.env.GH_TOKEN}`);
+    }
+
+    // Pass through git author info if available
+    if (process.env.GIT_AUTHOR_NAME) {
+      env.push(`GIT_AUTHOR_NAME=${process.env.GIT_AUTHOR_NAME}`);
+    }
+    if (process.env.GIT_AUTHOR_EMAIL) {
+      env.push(`GIT_AUTHOR_EMAIL=${process.env.GIT_AUTHOR_EMAIL}`);
+    }
+    if (process.env.GIT_COMMITTER_NAME) {
+      env.push(`GIT_COMMITTER_NAME=${process.env.GIT_COMMITTER_NAME}`);
+    }
+    if (process.env.GIT_COMMITTER_EMAIL) {
+      env.push(`GIT_COMMITTER_EMAIL=${process.env.GIT_COMMITTER_EMAIL}`);
     }
 
     // Additional config
@@ -318,10 +339,7 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
     // NO MOUNTING workspace - we'll copy files instead
     const volumes: string[] = [];
 
-    // Mount SSH keys if available
-    if (credentials.github?.sshKey) {
-      volumes.push(`${process.env.HOME}/.ssh:/home/claude/.ssh:ro`);
-    }
+    // NO SSH mounting - we'll use GitHub tokens instead
 
     // Add custom volumes
     if (this.config.volumes) {
@@ -376,6 +394,14 @@ exec /bin/bash`;
           cd /workspace &&
           sudo chown -R claude:claude /workspace &&
           git config --global --add safe.directory /workspace &&
+          # Clean up macOS resource fork files in git pack directory
+          find .git/objects/pack -name "._pack-*.idx" -type f -delete 2>/dev/null || true &&
+          # Configure git to use GitHub token if available
+          if [ -n "$GITHUB_TOKEN" ]; then
+            git config --global url."https://\${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+            git config --global url."https://\${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
+            echo "✓ Configured git to use GitHub token"
+          fi &&
           git checkout -b "${targetBranch}" &&
           echo "✓ Created branch: ${targetBranch}" &&
           echo '${startupScript}' > /home/claude/start-session.sh &&
@@ -678,7 +704,8 @@ exec /bin/bash`;
       // Also copy .git directory to preserve git history
       console.log(chalk.green("Copying git history..."));
       const gitTarFile = `/tmp/claude-sandbox-git-${Date.now()}.tar`;
-      execSync(`tar -cf "${gitTarFile}" .git`, {
+      // Exclude macOS resource fork files when creating git archive
+      execSync(`tar -cf "${gitTarFile}" --exclude="._*" .git`, {
         cwd: workDir,
         stdio: "pipe",
       });
@@ -932,6 +959,8 @@ exec /bin/bash`;
       // Don't throw - this is not critical for container operation
     }
   }
+
+
 
   async cleanup(): Promise<void> {
     for (const [, container] of this.containers) {

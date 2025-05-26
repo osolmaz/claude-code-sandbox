@@ -116,9 +116,11 @@ export class CredentialManager {
   private async discoverGitHubCredentials(): Promise<Credentials['github']> {
     const github: Credentials['github'] = {};
 
-    // Check for GitHub token
+    // Check for GitHub token in environment
     if (process.env.GITHUB_TOKEN) {
       github.token = process.env.GITHUB_TOKEN;
+    } else if (process.env.GH_TOKEN) {
+      github.token = process.env.GH_TOKEN;
     } else {
       // Try to get from gh CLI
       try {
@@ -126,20 +128,6 @@ export class CredentialManager {
         if (token) github.token = token;
       } catch {
         // gh CLI not available or not authenticated
-      }
-    }
-
-    // Check for SSH key
-    const sshKeyPath = path.join(os.homedir(), '.ssh', 'id_rsa');
-    try {
-      github.sshKey = await fs.readFile(sshKeyPath, 'utf-8');
-    } catch {
-      // Try ed25519 key
-      try {
-        const ed25519Path = path.join(os.homedir(), '.ssh', 'id_ed25519');
-        github.sshKey = await fs.readFile(ed25519Path, 'utf-8');
-      } catch {
-        // No SSH key found
       }
     }
 

@@ -24,7 +24,6 @@ export interface Credentials {
   };
   github?: {
     token?: string;
-    sshKey?: string;
     gitConfig?: string;
   };
 }
