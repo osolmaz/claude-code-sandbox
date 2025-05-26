@@ -9,6 +9,7 @@ description: "Integrate Claude Code with your favorite development environments"
 tags:
   - "clippings"
 ---
+
 Claude Code seamlessly integrates with popular Integrated Development Environments (IDEs) to enhance your coding workflow. This integration allows you to leverage Claude’s capabilities directly within your preferred development environment.
 
 ## Supported IDEs
@@ -65,10 +66,10 @@ When using an external terminal, to ensure Claude has default access to the same
 
 - Ensure you’re running Claude Code from VS Code’s integrated terminal
 - Ensure that the CLI corresponding to your IDE is installed:
-	- For VS Code: `code` command should be available
-	- For Cursor: `cursor` command should be available
-	- For Windsurf: `windsurf` command should be available
-	- If not installed, use `Cmd+Shift+P` (Mac) or `Ctrl+Shift+P` (Windows/Linux) and search for “Shell Command: Install ‘code’ command in PATH” (or the equivalent for your IDE)
+  - For VS Code: `code` command should be available
+  - For Cursor: `cursor` command should be available
+  - For Windsurf: `windsurf` command should be available
+  - If not installed, use `Cmd+Shift+P` (Mac) or `Ctrl+Shift+P` (Windows/Linux) and search for “Shell Command: Install ‘code’ command in PATH” (or the equivalent for your IDE)
 - Check that VS Code has permission to install extensions
 
 ### JetBrains plugin not working

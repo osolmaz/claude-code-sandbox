@@ -9,16 +9,17 @@ description: "Configure Claude Code to work with Amazon Bedrock and Google Verte
 tags:
   - "clippings"
 ---
+
 ## Model configuration
 
 Claude Code uses the following defaults:
 
-| Provider | Default Model |
-| --- | --- |
-| Anthropic Console | `claude-sonnet-4-20250514` |
-| Claude Max | `claude-opus-4-20250514` or `claude-sonnet-4-20250514` based on Max usage limits |
-| Amazon Bedrock | `claude-3-7-sonnet-20250219` |
-| Google Vertex AI | `claude-sonnet-4-20250514` |
+| Provider          | Default Model                                                                    |
+| ----------------- | -------------------------------------------------------------------------------- |
+| Anthropic Console | `claude-sonnet-4-20250514`                                                       |
+| Claude Max        | `claude-opus-4-20250514` or `claude-sonnet-4-20250514` based on Max usage limits |
+| Amazon Bedrock    | `claude-3-7-sonnet-20250219`                                                     |
+| Google Vertex AI  | `claude-sonnet-4-20250514`                                                       |
 
 The default values can be overridden in several ways based on the following precedence from top to bottom:
 
@@ -132,10 +133,10 @@ ANTHROPIC_AUTH_TOKEN=your-proxy-key
 2. Author a key helper script to provide authentication tokens
 3. Register the script under `apiKeyHelper` configuration in your Claude Code settings
 4. Set the token lifetime to enable automatic refresh:
-	```bash
-	CLAUDE_CODE_API_KEY_HELPER_TTL_MS=3600000
-	```
-	Set this to the lifetime (in milliseconds) of tokens returned by your `apiKeyHelper`.
+   ```bash
+   CLAUDE_CODE_API_KEY_HELPER_TTL_MS=3600000
+   ```
+   Set this to the lifetime (in milliseconds) of tokens returned by your `apiKeyHelper`.
 
 #### Step 3: Configure your deployment
 
@@ -148,9 +149,9 @@ Choose which Claude deployment you want to use through LiteLLM:
 ##### Option A: Anthropic API through LiteLLM
 
 1. Configure the LiteLLM endpoint:
-	```bash
-	ANTHROPIC_BASE_URL=https://litellm-url:4000/anthropic
-	```
+   ```bash
+   ANTHROPIC_BASE_URL=https://litellm-url:4000/anthropic
+   ```
 
 ##### Option B: Bedrock through LiteLLM
 
@@ -169,7 +170,7 @@ If you prefer to use local GCP credentials:
 1. Authenticate with GCP locally:
 2. Configure Vertex settings:
 3. Update LiteLLM header configuration:
-	Ensure your LiteLLM config has `general_settings.litellm_key_header_name` set to `Proxy-Authorization`, since the pass-through GCP token will be located on the `Authorization` header.
+   Ensure your LiteLLM config has `general_settings.litellm_key_header_name` set to `Proxy-Authorization`, since the pass-through GCP token will be located on the `Authorization` header.
 
 #### Step 4. Selecting a model
 

@@ -9,6 +9,7 @@ description: "Monitor Claude Code usage with OpenTelemetry metrics"
 tags:
   - "clippings"
 ---
+
 OpenTelemetry support is currently in beta and details are subject to change.
 
 ## OpenTelemetry in Claude Code
@@ -42,26 +43,26 @@ Managed settings can be distributed via MDM (Mobile Device Management) or other 
 
 ### Common Configuration Variables
 
-| Environment Variable | Description | Example Values |
-| --- | --- | --- |
-| `CLAUDE_CODE_ENABLE_TELEMETRY` | Enables telemetry collection (required) | `1` |
-| `OTEL_METRICS_EXPORTER` | Exporter type(s) to use (comma-separated) | `console`, `otlp`, `prometheus` |
-| `OTEL_EXPORTER_OTLP_PROTOCOL` | Protocol for OTLP exporter | `grpc`, `http/json`, `http/protobuf` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP collector endpoint | `http://localhost:4317` |
-| `OTEL_EXPORTER_OTLP_HEADERS` | Authentication headers for OTLP | `Authorization=Bearer token` |
-| `OTEL_EXPORTER_OTLP_METRICS_CLIENT_KEY` | Client key for mTLS authentication | Path to client key file |
-| `OTEL_EXPORTER_OTLP_METRICS_CLIENT_CERTIFICATE` | Client certificate for mTLS authentication | Path to client cert file |
-| `OTEL_METRIC_EXPORT_INTERVAL` | Export interval in milliseconds (default: 10000) | `5000`, `60000` |
+| Environment Variable                            | Description                                      | Example Values                       |
+| ----------------------------------------------- | ------------------------------------------------ | ------------------------------------ |
+| `CLAUDE_CODE_ENABLE_TELEMETRY`                  | Enables telemetry collection (required)          | `1`                                  |
+| `OTEL_METRICS_EXPORTER`                         | Exporter type(s) to use (comma-separated)        | `console`, `otlp`, `prometheus`      |
+| `OTEL_EXPORTER_OTLP_PROTOCOL`                   | Protocol for OTLP exporter                       | `grpc`, `http/json`, `http/protobuf` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`                   | OTLP collector endpoint                          | `http://localhost:4317`              |
+| `OTEL_EXPORTER_OTLP_HEADERS`                    | Authentication headers for OTLP                  | `Authorization=Bearer token`         |
+| `OTEL_EXPORTER_OTLP_METRICS_CLIENT_KEY`         | Client key for mTLS authentication               | Path to client key file              |
+| `OTEL_EXPORTER_OTLP_METRICS_CLIENT_CERTIFICATE` | Client certificate for mTLS authentication       | Path to client cert file             |
+| `OTEL_METRIC_EXPORT_INTERVAL`                   | Export interval in milliseconds (default: 10000) | `5000`, `60000`                      |
 
 ### Metrics Cardinality Control
 
 The following environment variables control which attributes are included in metrics to manage cardinality:
 
-| Environment Variable | Description | Default Value | Example to Disable |
-| --- | --- | --- | --- |
-| `OTEL_METRICS_INCLUDE_SESSION_ID` | Include session.id attribute in metrics | `true` | `false` |
-| `OTEL_METRICS_INCLUDE_VERSION` | Include app.version attribute in metrics | `false` | `true` |
-| `OTEL_METRICS_INCLUDE_ACCOUNT_UUID` | Include user.account\_uuid attribute in metrics | `true` | `false` |
+| Environment Variable                | Description                                    | Default Value | Example to Disable |
+| ----------------------------------- | ---------------------------------------------- | ------------- | ------------------ |
+| `OTEL_METRICS_INCLUDE_SESSION_ID`   | Include session.id attribute in metrics        | `true`        | `false`            |
+| `OTEL_METRICS_INCLUDE_VERSION`      | Include app.version attribute in metrics       | `false`       | `true`             |
+| `OTEL_METRICS_INCLUDE_ACCOUNT_UUID` | Include user.account_uuid attribute in metrics | `true`        | `false`            |
 
 These variables help control the cardinality of metrics, which affects storage requirements and query performance in your metrics backend. Lower cardinality generally means better performance and lower storage costs but less granular data for analysis.
 
@@ -71,14 +72,14 @@ These variables help control the cardinality of metrics, which affects storage r
 
 Claude Code exports the following metrics:
 
-| Metric Name | Description | Unit |
-| --- | --- | --- |
-| `claude_code.session.count` | Count of CLI sessions started | count |
-| `claude_code.lines_of_code.count` | Count of lines of code modified | count |
-| `claude_code.pull_request.count` | Number of pull requests created | count |
-| `claude_code.commit.count` | Number of git commits created | count |
-| `claude_code.cost.usage` | Cost of the Claude Code session | USD |
-| `claude_code.token.usage` | Number of tokens used | tokens |
+| Metric Name                       | Description                     | Unit   |
+| --------------------------------- | ------------------------------- | ------ |
+| `claude_code.session.count`       | Count of CLI sessions started   | count  |
+| `claude_code.lines_of_code.count` | Count of lines of code modified | count  |
+| `claude_code.pull_request.count`  | Number of pull requests created | count  |
+| `claude_code.commit.count`        | Number of git commits created   | count  |
+| `claude_code.cost.usage`          | Cost of the Claude Code session | USD    |
+| `claude_code.token.usage`         | Number of tokens used           | tokens |
 
 ### Metric Details
 
@@ -125,12 +126,12 @@ These metrics provide insights into usage patterns, productivity, and costs:
 
 ### Usage Monitoring
 
-| Metric | Analysis Opportunity |
-| --- | --- |
-| `claude_code.token.usage` | Break down by `type` (input/output), user, team, or model |
-| `claude_code.session.count` | Track adoption and engagement over time |
-| `claude_code.lines_of_code.count` | Measure productivity by tracking code additions/removals |
-| `claude_code.commit.count` & `claude_code.pull_request.count` | Understand impact on development workflows |
+| Metric                                                        | Analysis Opportunity                                      |
+| ------------------------------------------------------------- | --------------------------------------------------------- |
+| `claude_code.token.usage`                                     | Break down by `type` (input/output), user, team, or model |
+| `claude_code.session.count`                                   | Track adoption and engagement over time                   |
+| `claude_code.lines_of_code.count`                             | Measure productivity by tracking code additions/removals  |
+| `claude_code.commit.count` & `claude_code.pull_request.count` | Understand impact on development workflows                |
 
 ### Cost Monitoring
 
@@ -153,10 +154,10 @@ All metrics can be segmented by `user.account_uuid`, `organization.id`, `session
 
 ## Backend Considerations
 
-| Backend Type | Best For |
-| --- | --- |
-| Time series databases (Prometheus) | Rate calculations, aggregated metrics |
-| Columnar stores (ClickHouse) | Complex queries, unique user analysis |
+| Backend Type                                 | Best For                                   |
+| -------------------------------------------- | ------------------------------------------ |
+| Time series databases (Prometheus)           | Rate calculations, aggregated metrics      |
+| Columnar stores (ClickHouse)                 | Complex queries, unique user analysis      |
 | Observability platforms (Honeycomb, Datadog) | Advanced querying, visualization, alerting |
 
 For DAU/WAU/MAU metrics, choose backends that support efficient unique value queries.

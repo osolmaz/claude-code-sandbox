@@ -9,10 +9,7 @@
   "environment": {
     "NODE_ENV": "development"
   },
-  "setupCommands": [
-    "npm install",
-    "npm run build"
-  ],
+  "setupCommands": ["npm install", "npm run build"],
   "volumes": [],
   "mounts": [
     {

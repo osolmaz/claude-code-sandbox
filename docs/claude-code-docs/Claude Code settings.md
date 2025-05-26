@@ -9,6 +9,7 @@ description: "Learn how to configure Claude Code with global and project-level s
 tags:
   - "clippings"
 ---
+
 Claude Code offers a variety of settings to configure its behavior to meet your needs. You can configure Claude Code by running `claude config` in your terminal, or the `/config` command when using the interactive REPL.
 
 ## Configuration hierarchy
@@ -25,12 +26,12 @@ Example settings.json
 
 `settings.json` supports a number of options:
 
-| Key | Description | Example |
-| --- | --- | --- |
-| `apiKeyHelper` | Custom script to generate an Anthropic API key | `/bin/generate_temp_api_key.sh` |
-| `cleanupPeriodDays` | How long to locally retain chat transcripts (default: 30 days) | `20` |
-| `env` | Environment variables that will be applied to every session | `{"FOO": "bar"}` |
-| `includeCoAuthoredBy` | Whether to include the `co-authored-by Claude` byline in git commits and pull requests (default: `true`) | `false` |
+| Key                   | Description                                                                                              | Example                         |
+| --------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `apiKeyHelper`        | Custom script to generate an Anthropic API key                                                           | `/bin/generate_temp_api_key.sh` |
+| `cleanupPeriodDays`   | How long to locally retain chat transcripts (default: 30 days)                                           | `20`                            |
+| `env`                 | Environment variables that will be applied to every session                                              | `{"FOO": "bar"}`                |
+| `includeCoAuthoredBy` | Whether to include the `co-authored-by Claude` byline in git commits and pull requests (default: `true`) | `false`                         |
 
 ### Settings precedence
 
@@ -60,12 +61,12 @@ By default `config` changes your project configuration. To manage your global co
 
 To set a global configuration, use `claude config set -g <key> <value>`:
 
-| Key | Description | Example |
-| --- | --- | --- |
-| `autoUpdaterStatus` | Enable or disable the auto-updater (default: `enabled`) | `disabled` |
-| `preferredNotifChannel` | Where you want to receive notifications (default: `iterm2`) | `iterm2`, `iterm2_with_bell`, `terminal_bell`, or `notifications_disabled` |
-| `theme` | Color theme | `dark`, `light`, `light-daltonized`, or `dark-daltonized` |
-| `verbose` | Whether to show full bash and command outputs (default: `false`) | `true` |
+| Key                     | Description                                                      | Example                                                                    |
+| ----------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `autoUpdaterStatus`     | Enable or disable the auto-updater (default: `enabled`)          | `disabled`                                                                 |
+| `preferredNotifChannel` | Where you want to receive notifications (default: `iterm2`)      | `iterm2`, `iterm2_with_bell`, `terminal_bell`, or `notifications_disabled` |
+| `theme`                 | Color theme                                                      | `dark`, `light`, `light-daltonized`, or `dark-daltonized`                  |
+| `verbose`               | Whether to show full bash and command outputs (default: `false`) | `true`                                                                     |
 
 We are in the process of migration global configuration to `settings.json`.
 
@@ -93,14 +94,14 @@ MCP tool names follow the format: `mcp__server_name__tool_name` where:
 
 More examples:
 
-| Rule | Description |
-| --- | --- |
-| `Bash(npm run build)` | Matches the exact Bash command `npm run build`. |
-| `Bash(npm run test:*)` | Matches Bash commands starting with `npm run test`. See note below about command separator handling. |
-| `Edit(~/.zshrc)` | Matches the `~/.zshrc` file. |
-| `Read(node_modules/**)` | Matches any `node_modules` directory. |
-| `mcp__puppeteer__puppeteer_navigate` | Matches the `puppeteer_navigate` tool from the `puppeteer` MCP server. |
-| `WebFetch(domain:example.com)` | Matches fetch requests to example.com |
+| Rule                                 | Description                                                                                          |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `Bash(npm run build)`                | Matches the exact Bash command `npm run build`.                                                      |
+| `Bash(npm run test:*)`               | Matches Bash commands starting with `npm run test`. See note below about command separator handling. |
+| `Edit(~/.zshrc)`                     | Matches the `~/.zshrc` file.                                                                         |
+| `Read(node_modules/**)`              | Matches any `node_modules` directory.                                                                |
+| `mcp__puppeteer__puppeteer_navigate` | Matches the `puppeteer_navigate` tool from the `puppeteer` MCP server.                               |
+| `WebFetch(domain:example.com)`       | Matches fetch requests to example.com                                                                |
 
 Claude Code is aware of command separators (like `&&`) so a prefix match rule like `Bash(safe-cmd:*)` won’t give it permission to run the command `safe-cmd     && other-cmd`
 
@@ -222,27 +223,27 @@ Claude Code supports the following environment variables to control its behavior
 
 All environment variables can also be configured in [`settings.json`](https://docs.anthropic.com/en/docs/claude-code/settings#available-settings). This is useful as a way to automatically set environment variables for each session, or to roll out a set of environment variables for your whole team or organization.
 
-| Variable | Purpose |
-| --- | --- |
-| `ANTHROPIC_AUTH_TOKEN` | Custom value for the `Authorization` and `Proxy-Authorization` headers (the value you set here will be prefixed with `Bearer `) |
-| `ANTHROPIC_CUSTOM_HEADERS` | Custom headers you want to add to the request (in `Name: Value` format) |
-| `ANTHROPIC_MODEL` | Name of custom model to use (see [Model Configuration](https://docs.anthropic.com/en/docs/claude-code/bedrock-vertex-proxies#model-configuration)) |
-| `ANTHROPIC_SMALL_FAST_MODEL` | Name of [Haiku-class model for background tasks](https://docs.anthropic.com/en/docs/claude-code/costs) |
-| `BASH_DEFAULT_TIMEOUT_MS` | Default timeout for long-running bash commands |
-| `BASH_MAX_TIMEOUT_MS` | Maximum timeout the model can set for long-running bash commands |
-| `BASH_MAX_OUTPUT_LENGTH` | Maximum number of characters in bash outputs before they are middle-truncated |
-| `CLAUDE_CODE_API_KEY_HELPER_TTL_MS` | Interval at which credentials should be refreshed (when using `apiKeyHelper`) |
-| `CLAUDE_CODE_USE_BEDROCK` | Use Bedrock (see [Bedrock & Vertex](https://docs.anthropic.com/en/docs/claude-code/bedrock-vertex-proxies)) |
-| `CLAUDE_CODE_USE_VERTEX` | Use Vertex (see [Bedrock & Vertex](https://docs.anthropic.com/en/docs/claude-code/bedrock-vertex-proxies)) |
-| `CLAUDE_CODE_SKIP_VERTEX_AUTH` | Skip Google authentication for Vertex (eg. when using a proxy) |
-| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | Equivalent of setting `DISABLE_AUTOUPDATER`, `DISABLE_BUG_COMMAND`, `DISABLE_ERROR_REPORTING`, and `DISABLE_TELEMETRY` |
-| `DISABLE_AUTOUPDATER` | Set to `1` to disable the automatic updater |
-| `DISABLE_BUG_COMMAND` | Set to `1` to disable the `/bug` command |
-| `DISABLE_COST_WARNINGS` | Set to `1` to disable cost warning messages |
-| `DISABLE_ERROR_REPORTING` | Set to `1` to opt out of Sentry error reporting |
-| `DISABLE_TELEMETRY` | Set to `1` to opt out of Statsig telemetry (note that Statsig events do not include user data like code, file paths, or bash commands) |
-| `HTTP_PROXY` | Specify HTTP proxy server for network connections |
-| `HTTPS_PROXY` | Specify HTTPS proxy server for network connections |
-| `MAX_THINKING_TOKENS` | Force a thinking for the model budget |
-| `MCP_TIMEOUT` | Timeout in milliseconds for MCP server startup |
-| `MCP_TOOL_TIMEOUT` | Timeout in milliseconds for MCP tool execution |
+| Variable                                   | Purpose                                                                                                                                            |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ANTHROPIC_AUTH_TOKEN`                     | Custom value for the `Authorization` and `Proxy-Authorization` headers (the value you set here will be prefixed with `Bearer `)                    |
+| `ANTHROPIC_CUSTOM_HEADERS`                 | Custom headers you want to add to the request (in `Name: Value` format)                                                                            |
+| `ANTHROPIC_MODEL`                          | Name of custom model to use (see [Model Configuration](https://docs.anthropic.com/en/docs/claude-code/bedrock-vertex-proxies#model-configuration)) |
+| `ANTHROPIC_SMALL_FAST_MODEL`               | Name of [Haiku-class model for background tasks](https://docs.anthropic.com/en/docs/claude-code/costs)                                             |
+| `BASH_DEFAULT_TIMEOUT_MS`                  | Default timeout for long-running bash commands                                                                                                     |
+| `BASH_MAX_TIMEOUT_MS`                      | Maximum timeout the model can set for long-running bash commands                                                                                   |
+| `BASH_MAX_OUTPUT_LENGTH`                   | Maximum number of characters in bash outputs before they are middle-truncated                                                                      |
+| `CLAUDE_CODE_API_KEY_HELPER_TTL_MS`        | Interval at which credentials should be refreshed (when using `apiKeyHelper`)                                                                      |
+| `CLAUDE_CODE_USE_BEDROCK`                  | Use Bedrock (see [Bedrock & Vertex](https://docs.anthropic.com/en/docs/claude-code/bedrock-vertex-proxies))                                        |
+| `CLAUDE_CODE_USE_VERTEX`                   | Use Vertex (see [Bedrock & Vertex](https://docs.anthropic.com/en/docs/claude-code/bedrock-vertex-proxies))                                         |
+| `CLAUDE_CODE_SKIP_VERTEX_AUTH`             | Skip Google authentication for Vertex (eg. when using a proxy)                                                                                     |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | Equivalent of setting `DISABLE_AUTOUPDATER`, `DISABLE_BUG_COMMAND`, `DISABLE_ERROR_REPORTING`, and `DISABLE_TELEMETRY`                             |
+| `DISABLE_AUTOUPDATER`                      | Set to `1` to disable the automatic updater                                                                                                        |
+| `DISABLE_BUG_COMMAND`                      | Set to `1` to disable the `/bug` command                                                                                                           |
+| `DISABLE_COST_WARNINGS`                    | Set to `1` to disable cost warning messages                                                                                                        |
+| `DISABLE_ERROR_REPORTING`                  | Set to `1` to opt out of Sentry error reporting                                                                                                    |
+| `DISABLE_TELEMETRY`                        | Set to `1` to opt out of Statsig telemetry (note that Statsig events do not include user data like code, file paths, or bash commands)             |
+| `HTTP_PROXY`                               | Specify HTTP proxy server for network connections                                                                                                  |
+| `HTTPS_PROXY`                              | Specify HTTPS proxy server for network connections                                                                                                 |
+| `MAX_THINKING_TOKENS`                      | Force a thinking for the model budget                                                                                                              |
+| `MCP_TIMEOUT`                              | Timeout in milliseconds for MCP server startup                                                                                                     |
+| `MCP_TOOL_TIMEOUT`                         | Timeout in milliseconds for MCP tool execution                                                                                                     |

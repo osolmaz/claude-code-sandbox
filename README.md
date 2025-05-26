@@ -43,6 +43,7 @@ claude-sandbox
 ```
 
 This will:
+
 1. Create a new branch (`claude/[timestamp]`)
 2. Start a Docker container with Claude Code
 3. Forward your credentials automatically
@@ -79,13 +80,8 @@ Create a `claude-sandbox.config.json` file (see `claude-sandbox.config.example.j
   "environment": {
     "NODE_ENV": "development"
   },
-  "setupCommands": [
-    "npm install",
-    "npm run build"
-  ],
-  "volumes": [
-    "/host/path:/container/path:ro"
-  ],
+  "setupCommands": ["npm install", "npm run build"],
+  "volumes": ["/host/path:/container/path:ro"],
   "mounts": [
     {
       "source": "./data",
@@ -134,6 +130,7 @@ The `mounts` array allows you to mount files or directories into the container:
 - `readonly`: Optional boolean to make the mount read-only (default: false)
 
 Example use cases:
+
 - Mount data directories that shouldn't be in git
 - Share configuration files between host and container
 - Mount build artifacts or dependencies
@@ -146,6 +143,7 @@ Example use cases:
 Claude Code Sandbox automatically discovers and forwards:
 
 **Claude Credentials:**
+
 - Anthropic API keys (`ANTHROPIC_API_KEY`)
 - macOS Keychain credentials (Claude Code)
 - AWS Bedrock credentials
@@ -153,6 +151,7 @@ Claude Code Sandbox automatically discovers and forwards:
 - Claude configuration files (`.claude.json`, `.claude/`)
 
 **GitHub Credentials:**
+
 - GitHub CLI authentication (`gh auth`)
 - GitHub tokens (`GITHUB_TOKEN`, `GH_TOKEN`)
 - Git configuration (`.gitconfig`)
@@ -168,6 +167,7 @@ Claude Code Sandbox automatically discovers and forwards:
 ### Commit Monitoring
 
 When Claude makes a commit:
+
 1. Real-time notification appears
 2. Full diff is displayed with syntax highlighting
 3. Interactive menu offers options:
@@ -179,6 +179,7 @@ When Claude makes a commit:
 ### Asynchronous Operation
 
 Run multiple instances simultaneously:
+
 ```bash
 # Terminal 1
 claude-sandbox
@@ -195,6 +196,7 @@ claude-sandbox --detached --name background-task
 ### Default Image
 
 The default Docker image includes:
+
 - Ubuntu 22.04
 - Git, GitHub CLI
 - Node.js, npm
@@ -224,6 +226,7 @@ ENV CUSTOM_VAR=value
 ```
 
 Reference in config:
+
 ```json
 {
   "dockerfile": "./my-custom.Dockerfile"
@@ -233,17 +236,20 @@ Reference in config:
 ## Workflow Example
 
 1. **Start Claude Sandbox:**
+
    ```bash
    cd my-project
    claude-sandbox
    ```
 
 2. **Interact with Claude:**
+
    ```
    > Help me refactor the authentication module to use JWT tokens
    ```
 
 3. **Claude works autonomously:**
+
    - Explores codebase
    - Makes changes
    - Runs tests
@@ -264,26 +270,34 @@ Reference in config:
 ## Troubleshooting
 
 ### Claude Code not found
+
 Ensure Claude Code is installed globally:
+
 ```bash
 npm install -g @anthropic-ai/claude-code@latest
 ```
 
 ### Docker permission issues
+
 Add your user to the docker group:
+
 ```bash
 sudo usermod -aG docker $USER
 # Log out and back in for changes to take effect
 ```
 
 ### Container cleanup
+
 Remove all Claude Sandbox containers and images:
+
 ```bash
 npm run purge-containers
 ```
 
 ### Credential discovery fails
+
 Set credentials explicitly:
+
 ```bash
 export ANTHROPIC_API_KEY=your-key
 export GITHUB_TOKEN=your-token
@@ -292,7 +306,9 @@ export GITHUB_TOKEN=your-token
 Or use an `.env` file with `envFile` config option.
 
 ### Build errors
+
 Ensure you're using Node.js >= 18.0.0:
+
 ```bash
 node --version
 ```

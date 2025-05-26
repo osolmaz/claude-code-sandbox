@@ -185,14 +185,14 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
           if (event.stream) {
             process.stdout.write(event.stream);
           }
-        }
+        },
       );
     });
   }
 
   private async buildImage(
     dockerfilePath: string,
-    imageName: string
+    imageName: string,
   ): Promise<void> {
     const buildContext = path.dirname(dockerfilePath);
 
@@ -204,7 +204,7 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
       {
         dockerfile: path.basename(dockerfilePath),
         t: imageName,
-      }
+      },
     );
 
     await new Promise((resolve, reject) => {
@@ -218,13 +218,13 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
           if (event.stream) {
             process.stdout.write(event.stream);
           }
-        }
+        },
       );
     });
   }
 
   private async createContainer(
-    containerConfig: any
+    containerConfig: any,
   ): Promise<Docker.Container> {
     const { credentials, workDir } = containerConfig;
 
@@ -270,7 +270,9 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
       try {
         const envFilePath = path.resolve(this.config.envFile);
         if (fs.existsSync(envFilePath)) {
-          console.log(chalk.blue(`• Loading environment from ${this.config.envFile}...`));
+          console.log(
+            chalk.blue(`• Loading environment from ${this.config.envFile}...`),
+          );
 
           const envContent = fs.readFileSync(envFilePath, "utf-8");
           const lines = envContent.split("\n");
@@ -294,8 +296,10 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
             let value = trimmedLine.substring(firstEqualIndex + 1).trim();
 
             // Remove surrounding quotes if present
-            if ((value.startsWith('"') && value.endsWith('"')) ||
-                (value.startsWith("'") && value.endsWith("'"))) {
+            if (
+              (value.startsWith('"') && value.endsWith('"')) ||
+              (value.startsWith("'") && value.endsWith("'"))
+            ) {
               value = value.slice(1, -1);
             }
 
@@ -304,12 +308,25 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
             }
           }
 
-          console.log(chalk.green(`✓ Loaded ${env.length} environment variables from ${this.config.envFile}`));
+          console.log(
+            chalk.green(
+              `✓ Loaded ${env.length} environment variables from ${this.config.envFile}`,
+            ),
+          );
         } else {
-          console.log(chalk.yellow(`⚠ Environment file ${this.config.envFile} not found`));
+          console.log(
+            chalk.yellow(
+              `⚠ Environment file ${this.config.envFile} not found`,
+            ),
+          );
         }
       } catch (error) {
-        console.error(chalk.yellow(`⚠ Failed to load environment file ${this.config.envFile}:`), error);
+        console.error(
+          chalk.yellow(
+            `⚠ Failed to load environment file ${this.config.envFile}:`,
+          ),
+          error,
+        );
       }
     }
 
@@ -382,7 +399,10 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
     return env;
   }
 
-  private prepareVolumes(_workDir: string, _credentials: Credentials): string[] {
+  private prepareVolumes(
+    _workDir: string,
+    _credentials: Credentials,
+  ): string[] {
     // NO MOUNTING workspace - we'll copy files instead
     const volumes: string[] = [];
 
@@ -403,9 +423,12 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
         try {
           // Expand environment variables in source path
           let expandedSource = mount.source.replace(/\$HOME/g, os.homedir());
-          expandedSource = expandedSource.replace(/\$(\w+)/g, (match, varName) => {
-            return process.env[varName] || match;
-          });
+          expandedSource = expandedSource.replace(
+            /\$(\w+)/g,
+            (match, varName) => {
+              return process.env[varName] || match;
+            },
+          );
 
           // Resolve the source path
           const sourcePath = path.isAbsolute(expandedSource)
@@ -414,17 +437,24 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
 
           // Check if source exists
           if (!fs.existsSync(sourcePath)) {
-            console.log(chalk.yellow(`⚠ Mount source does not exist: ${mount.source} (resolved to ${sourcePath})`));
+            console.log(
+              chalk.yellow(
+                `⚠ Mount source does not exist: ${mount.source} (resolved to ${sourcePath})`,
+              ),
+            );
             continue;
           }
 
           // Expand environment variables in target path
           let expandedTarget = mount.target.replace(/\$HOME/g, "/home/claude");
-          expandedTarget = expandedTarget.replace(/\$(\w+)/g, (match, varName) => {
-            // For container paths, we need to use container's environment
-            if (varName === "HOME") return "/home/claude";
-            return match; // Keep other variables as-is
-          });
+          expandedTarget = expandedTarget.replace(
+            /\$(\w+)/g,
+            (match, varName) => {
+              // For container paths, we need to use container's environment
+              if (varName === "HOME") return "/home/claude";
+              return match; // Keep other variables as-is
+            },
+          );
 
           // Ensure target path is absolute
           const targetPath = path.isAbsolute(expandedTarget)
@@ -437,9 +467,16 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
             : `${sourcePath}:${targetPath}`;
 
           volumes.push(mountString);
-          console.log(chalk.blue(`✓ Mounting ${mount.source} → ${targetPath}${mount.readonly ? ' (read-only)' : ''}`));
+          console.log(
+            chalk.blue(
+              `✓ Mounting ${mount.source} → ${targetPath}${mount.readonly ? " (read-only)" : ""}`,
+            ),
+          );
         } catch (error) {
-          console.error(chalk.yellow(`⚠ Failed to process mount ${mount.source}:`), error);
+          console.error(
+            chalk.yellow(`⚠ Failed to process mount ${mount.source}:`),
+            error,
+          );
         }
       }
     }
@@ -538,11 +575,19 @@ exec /bin/bash`;
       // Execute custom setup commands if provided
       if (this.config.setupCommands && this.config.setupCommands.length > 0) {
         console.log(chalk.blue("• Running custom setup commands..."));
-        console.log(chalk.blue(`  Total commands to run: ${this.config.setupCommands.length}`));
+        console.log(
+          chalk.blue(
+            `  Total commands to run: ${this.config.setupCommands.length}`,
+          ),
+        );
 
         for (let i = 0; i < this.config.setupCommands.length; i++) {
           const command = this.config.setupCommands[i];
-          console.log(chalk.yellow(`\n[${i + 1}/${this.config.setupCommands.length}] Running command:`));
+          console.log(
+            chalk.yellow(
+              `\n[${i + 1}/${this.config.setupCommands.length}] Running command:`,
+            ),
+          );
           console.log(chalk.white(`  ${command}`));
 
           const cmdExec = await container.exec({
@@ -568,7 +613,11 @@ exec /bin/bash`;
               try {
                 const info = await cmdExec.inspect();
                 if (info.ExitCode !== 0) {
-                  console.error(chalk.red(`✗ Command failed with exit code ${info.ExitCode}`));
+                  console.error(
+                    chalk.red(
+                      `✗ Command failed with exit code ${info.ExitCode}`,
+                    ),
+                  );
                   hasError = true;
                 } else {
                   console.log(chalk.green(`✓ Command completed successfully`));
@@ -600,16 +649,18 @@ exec /bin/bash`;
     if (this.config.autoStartClaude) {
       console.log(chalk.yellow("• Claude Code will start automatically"));
       console.log(
-        chalk.yellow("• Press Ctrl+C to interrupt Claude and access the shell")
+        chalk.yellow("• Press Ctrl+C to interrupt Claude and access the shell"),
       );
     } else {
       console.log(
         chalk.yellow(
-          '• Type "claude --dangerously-skip-permissions" to start Claude Code'
-        )
+          '• Type "claude --dangerously-skip-permissions" to start Claude Code',
+        ),
       );
     }
-    console.log(chalk.yellow('• Press Ctrl+D or type "exit" to end the session'));
+    console.log(
+      chalk.yellow('• Press Ctrl+D or type "exit" to end the session'),
+    );
 
     const exec = await container.exec({
       Cmd: ["/home/claude/start-session.sh"],
@@ -718,7 +769,7 @@ exec /bin/bash`;
 
   private async _copyWorkingDirectory(
     container: Docker.Container,
-    workDir: string
+    workDir: string,
   ): Promise<void> {
     const { execSync } = require("child_process");
     const fs = require("fs");
@@ -739,7 +790,7 @@ exec /bin/bash`;
         {
           cwd: workDir,
           encoding: "utf-8",
-        }
+        },
       )
         .trim()
         .split("\n")
@@ -841,14 +892,21 @@ exec /bin/bash`;
       // First, try to get credentials from macOS Keychain if on Mac
       if (process.platform === "darwin") {
         try {
-          console.log(chalk.blue("• Checking macOS Keychain for Claude credentials..."));
-          const keychainCreds = execSync('security find-generic-password -s "Claude Code-credentials" -w', {
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"], // Suppress stderr
-          }).trim();
+          console.log(
+            chalk.blue("• Checking macOS Keychain for Claude credentials..."),
+          );
+          const keychainCreds = execSync(
+            'security find-generic-password -s "Claude Code-credentials" -w',
+            {
+              encoding: "utf-8",
+              stdio: ["pipe", "pipe", "pipe"], // Suppress stderr
+            },
+          ).trim();
 
           if (keychainCreds) {
-            console.log(chalk.green("✓ Found Claude credentials in macOS Keychain"));
+            console.log(
+              chalk.green("✓ Found Claude credentials in macOS Keychain"),
+            );
 
             // Create .claude directory structure
             const claudeDirTar = `/tmp/claude-keychain-${Date.now()}.tar`;
@@ -862,7 +920,7 @@ exec /bin/bash`;
               (err: any) => {
                 if (err) throw err;
                 pack.finalize();
-              }
+              },
             );
 
             const chunks: Buffer[] = [];
@@ -884,21 +942,27 @@ exec /bin/bash`;
             fs.unlinkSync(claudeDirTar);
 
             // Fix permissions
-            await container.exec({
-              Cmd: [
-                "/bin/bash",
-                "-c",
-                "sudo mkdir -p /home/claude/.claude && sudo chown -R claude:claude /home/claude/.claude && sudo chmod 700 /home/claude/.claude && sudo chmod 600 /home/claude/.claude/.credentials.json",
-              ],
-              AttachStdout: false,
-              AttachStderr: false,
-            }).then((exec) => exec.start({}));
+            await container
+              .exec({
+                Cmd: [
+                  "/bin/bash",
+                  "-c",
+                  "sudo mkdir -p /home/claude/.claude && sudo chown -R claude:claude /home/claude/.claude && sudo chmod 700 /home/claude/.claude && sudo chmod 600 /home/claude/.claude/.credentials.json",
+                ],
+                AttachStdout: false,
+                AttachStderr: false,
+              })
+              .then((exec) => exec.start({}));
 
-            console.log(chalk.green("✓ Claude Keychain credentials copied to container"));
+            console.log(
+              chalk.green("✓ Claude Keychain credentials copied to container"),
+            );
           }
         } catch (error) {
           // Keychain access failed or credentials not found - not critical
-          console.log(chalk.yellow("• No Claude credentials found in macOS Keychain"));
+          console.log(
+            chalk.yellow("• No Claude credentials found in macOS Keychain"),
+          );
         }
       }
 
@@ -912,10 +976,14 @@ exec /bin/bash`;
         const tarStream = require("tar-stream");
         const pack = tarStream.pack();
 
-        pack.entry({ name: ".claude.json", mode: 0o644 }, configContent, (err: any) => {
-          if (err) throw err;
-          pack.finalize();
-        });
+        pack.entry(
+          { name: ".claude.json", mode: 0o644 },
+          configContent,
+          (err: any) => {
+            if (err) throw err;
+            pack.finalize();
+          },
+        );
 
         const chunks: Buffer[] = [];
         pack.on("data", (chunk: any) => chunks.push(chunk));
@@ -936,16 +1004,26 @@ exec /bin/bash`;
         fs.unlinkSync(tarFile);
 
         // Fix permissions
-        await container.exec({
-          Cmd: ["/bin/bash", "-c", "sudo chown claude:claude /home/claude/.claude.json && chmod 644 /home/claude/.claude.json"],
-          AttachStdout: false,
-          AttachStderr: false,
-        }).then(exec => exec.start({}));
+        await container
+          .exec({
+            Cmd: [
+              "/bin/bash",
+              "-c",
+              "sudo chown claude:claude /home/claude/.claude.json && chmod 644 /home/claude/.claude.json",
+            ],
+            AttachStdout: false,
+            AttachStderr: false,
+          })
+          .then((exec) => exec.start({}));
       }
 
       // Copy .claude directory if it exists (but skip if we already copied from Keychain)
       const claudeDir = path.join(os.homedir(), ".claude");
-      if (fs.existsSync(claudeDir) && fs.statSync(claudeDir).isDirectory() && process.platform !== "darwin") {
+      if (
+        fs.existsSync(claudeDir) &&
+        fs.statSync(claudeDir).isDirectory() &&
+        process.platform !== "darwin"
+      ) {
         console.log(chalk.blue("• Copying .claude directory..."));
 
         const tarFile = `/tmp/claude-dir-${Date.now()}.tar`;
@@ -961,16 +1039,25 @@ exec /bin/bash`;
         fs.unlinkSync(tarFile);
 
         // Fix permissions recursively
-        await container.exec({
-          Cmd: ["/bin/bash", "-c", "sudo chown -R claude:claude /home/claude/.claude && chmod -R 755 /home/claude/.claude"],
-          AttachStdout: false,
-          AttachStderr: false,
-        }).then(exec => exec.start({}));
+        await container
+          .exec({
+            Cmd: [
+              "/bin/bash",
+              "-c",
+              "sudo chown -R claude:claude /home/claude/.claude && chmod -R 755 /home/claude/.claude",
+            ],
+            AttachStdout: false,
+            AttachStderr: false,
+          })
+          .then((exec) => exec.start({}));
       }
 
       console.log(chalk.green("✓ Claude configuration copied successfully"));
     } catch (error) {
-      console.error(chalk.yellow("⚠ Failed to copy Claude configuration:"), error);
+      console.error(
+        chalk.yellow("⚠ Failed to copy Claude configuration:"),
+        error,
+      );
       // Don't throw - this is not critical for container operation
     }
   }
@@ -1005,7 +1092,7 @@ exec /bin/bash`;
         (err: any) => {
           if (err) throw err;
           pack.finalize();
-        }
+        },
       );
 
       // Write the tar to a file
@@ -1046,7 +1133,7 @@ exec /bin/bash`;
     } catch (error) {
       console.error(
         chalk.yellow("⚠ Failed to copy git configuration:"),
-        error
+        error,
       );
       // Don't throw - this is not critical for container operation
     }

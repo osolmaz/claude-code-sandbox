@@ -20,12 +20,14 @@ gh auth login
 ```
 
 **How it works:**
+
 - Claude Sandbox runs `gh auth token` to get your token
 - Token is passed as `GITHUB_TOKEN` environment variable
 - Git is configured to use the token for both HTTPS and SSH URLs
 - Works for cloning, pulling, and pushing
 
 **Benefits:**
+
 - ✅ Cross-platform (macOS, Linux, Windows)
 - ✅ Secure (tokens can be scoped)
 - ✅ Easy to refresh (`gh auth refresh`)
@@ -47,12 +49,14 @@ claude-sandbox
 ```
 
 **Supported variables:**
+
 - `GITHUB_TOKEN` - Standard GitHub token variable
 - `GH_TOKEN` - GitHub CLI token variable
 
 ### 3. Git Configuration
 
 Your `.gitconfig` is automatically copied to containers, preserving:
+
 - User name and email
 - Custom aliases
 - Other git settings (excluding credential helpers)
@@ -77,6 +81,7 @@ claude-sandbox
 ### Manual Token Setup
 
 1. Create a Personal Access Token:
+
    - Go to GitHub Settings → Developer settings → Personal access tokens
    - Create a token with `repo` scope
    - Copy the token
@@ -126,6 +131,7 @@ Add GitHub token to your project's `claude-sandbox.config.json`:
 If you get "Permission denied" errors:
 
 1. Check if token is available:
+
    ```bash
    # In container
    echo $GITHUB_TOKEN
@@ -140,6 +146,7 @@ If you get "Permission denied" errors:
 ### Token Not Found
 
 If no token is detected:
+
 - Ensure you're logged in with `gh auth login`
 - Or set `GITHUB_TOKEN` environment variable
 - Check that the token has appropriate scopes
@@ -147,6 +154,7 @@ If no token is detected:
 ### Rate Limiting
 
 If you hit rate limits:
+
 - Ensure you're using an authenticated token
 - Check rate limit: `gh api rate_limit`
 
@@ -160,14 +168,17 @@ If you hit rate limits:
 ## Platform-Specific Notes
 
 ### macOS
+
 - GitHub CLI token stored in macOS Keychain
 - Git credentials may use osxkeychain helper
 
 ### Linux
+
 - GitHub CLI token in `~/.config/gh/`
 - Git credentials may use libsecret
 
 ### Windows (WSL)
+
 - Use WSL for best compatibility
 - GitHub CLI works in WSL
 
@@ -188,6 +199,7 @@ export GITHUB_TOKEN=ghp_personal_token
 ### Custom Git Configuration
 
 The container automatically configures git to use tokens for all GitHub URLs:
+
 - `https://github.com/` URLs use token authentication
 - `git@github.com:` URLs are rewritten to use HTTPS with token
 

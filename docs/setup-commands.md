@@ -5,6 +5,7 @@ This document explains how to run custom setup commands in your Claude Sandbox c
 ## Overview
 
 Setup commands allow you to automatically run initialization scripts when your container starts. This is useful for:
+
 - Installing project dependencies
 - Setting up databases
 - Configuring environment-specific settings
@@ -28,6 +29,7 @@ Add a `setupCommands` array to your `claude-sandbox.config.json`:
 ## Execution Order
 
 Setup commands run:
+
 1. **After** workspace files are copied
 2. **After** git branch is created
 3. **Before** Claude Code starts (if auto-start is enabled)
@@ -36,17 +38,15 @@ Setup commands run:
 ## Examples
 
 ### Node.js Project
+
 ```json
 {
-  "setupCommands": [
-    "npm install",
-    "npm run build",
-    "npm run db:migrate"
-  ]
+  "setupCommands": ["npm install", "npm run build", "npm run db:migrate"]
 }
 ```
 
 ### Python Project
+
 ```json
 {
   "setupCommands": [
@@ -58,6 +58,7 @@ Setup commands run:
 ```
 
 ### Installing System Packages
+
 ```json
 {
   "setupCommands": [
@@ -69,6 +70,7 @@ Setup commands run:
 ```
 
 ### Complex Setup
+
 ```json
 {
   "setupCommands": [
@@ -90,16 +92,19 @@ Setup commands run:
 ## Best Practices
 
 1. **Use `|| true`** for commands that might fail but shouldn't stop setup:
+
    ```json
    ["createdb myapp_dev || true"]
    ```
 
 2. **Chain related commands** with `&&`:
+
    ```json
    ["cd frontend && npm install && npm run build"]
    ```
 
 3. **Add comments** for clarity:
+
    ```json
    ["# Install Python dependencies", "pip install -r requirements.txt"]
    ```
@@ -124,6 +129,7 @@ All commands run in `/workspace` (your project root) as the `claude` user.
 ## Environment Variables
 
 Commands have access to:
+
 - All environment variables from your config
 - Standard container environment
 - `HOME=/home/claude`
@@ -139,31 +145,31 @@ Commands have access to:
 ## Troubleshooting
 
 ### Command Not Found
+
 Ensure the tool is installed in the Docker image or install it in your setup commands:
+
 ```json
 {
-  "setupCommands": [
-    "sudo apt-get update && sudo apt-get install -y <package>"
-  ]
+  "setupCommands": ["sudo apt-get update && sudo apt-get install -y <package>"]
 }
 ```
 
 ### Permission Denied
+
 The `claude` user has passwordless sudo access. Prefix commands with `sudo` if needed:
+
 ```json
 {
-  "setupCommands": [
-    "sudo systemctl start postgresql"
-  ]
+  "setupCommands": ["sudo systemctl start postgresql"]
 }
 ```
 
 ### Command Hangs
+
 Ensure commands don't wait for user input. Use flags like `-y` or `--yes`:
+
 ```json
 {
-  "setupCommands": [
-    "sudo apt-get install -y package-name"
-  ]
+  "setupCommands": ["sudo apt-get install -y package-name"]
 }
 ```

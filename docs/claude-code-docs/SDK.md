@@ -9,6 +9,7 @@ description: "Programmatically integrate Claude Code into your applications usin
 tags:
   - "clippings"
 ---
+
 The Claude Code SDK allows developers to programmatically integrate Claude Code into their applications. It enables running Claude Code as a subprocess, providing a way to build AI-powered coding assistants and tools that leverage Claude’s capabilities.
 
 The SDK currently support command line usage. TypeScript and Python SDKs are coming soon.
@@ -48,20 +49,20 @@ This security measure ensures that MCP tools are only used when explicitly permi
 
 The SDK leverages all the CLI options available in Claude Code. Here are the key ones for SDK usage:
 
-| Flag | Description | Example |
-| --- | --- | --- |
-| `--print`, `-p` | Run in non-interactive mode | `claude -p "query"` |
-| `--output-format` | Specify output format (`text`, `json`, `stream-json`) | `claude -p --output-format json` |
-| `--resume`, `-r` | Resume a conversation by session ID | `claude --resume abc123` |
-| `--continue`, `-c` | Continue the most recent conversation | `claude --continue` |
-| `--verbose` | Enable verbose logging | `claude --verbose` |
-| `--max-turns` | Limit agentic turns in non-interactive mode | `claude --max-turns 3` |
-| `--system-prompt` | Override system prompt (only with `--print`) | `claude --system-prompt "Custom instruction"` |
-| `--append-system-prompt` | Append to system prompt (only with `--print`) | `claude --append-system-prompt "Custom instruction"` |
-| `--allowedTools` | Comma/space-separated list of allowed tools (includes MCP tools) | `claude --allowedTools "Bash(npm install),mcp__filesystem__*"` |
-| `--disallowedTools` | Comma/space-separated list of denied tools | `claude --disallowedTools "Bash(git commit),mcp__github__*"` |
-| `--mcp-config` | Load MCP servers from a JSON file | `claude --mcp-config servers.json` |
-| `--permission-prompt-tool` | MCP tool for handling permission prompts (only with `--print`) | `claude --permission-prompt-tool mcp__auth__prompt` |
+| Flag                       | Description                                                      | Example                                                        |
+| -------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------- |
+| `--print`, `-p`            | Run in non-interactive mode                                      | `claude -p "query"`                                            |
+| `--output-format`          | Specify output format (`text`, `json`, `stream-json`)            | `claude -p --output-format json`                               |
+| `--resume`, `-r`           | Resume a conversation by session ID                              | `claude --resume abc123`                                       |
+| `--continue`, `-c`         | Continue the most recent conversation                            | `claude --continue`                                            |
+| `--verbose`                | Enable verbose logging                                           | `claude --verbose`                                             |
+| `--max-turns`              | Limit agentic turns in non-interactive mode                      | `claude --max-turns 3`                                         |
+| `--system-prompt`          | Override system prompt (only with `--print`)                     | `claude --system-prompt "Custom instruction"`                  |
+| `--append-system-prompt`   | Append to system prompt (only with `--print`)                    | `claude --append-system-prompt "Custom instruction"`           |
+| `--allowedTools`           | Comma/space-separated list of allowed tools (includes MCP tools) | `claude --allowedTools "Bash(npm install),mcp__filesystem__*"` |
+| `--disallowedTools`        | Comma/space-separated list of denied tools                       | `claude --disallowedTools "Bash(git commit),mcp__github__*"`   |
+| `--mcp-config`             | Load MCP servers from a JSON file                                | `claude --mcp-config servers.json`                             |
+| `--permission-prompt-tool` | MCP tool for handling permission prompts (only with `--print`)   | `claude --permission-prompt-tool mcp__auth__prompt`            |
 
 For a complete list of CLI options and features, see the [CLI usage](https://docs.anthropic.com/en/docs/claude-code/cli-usage) documentation.
 

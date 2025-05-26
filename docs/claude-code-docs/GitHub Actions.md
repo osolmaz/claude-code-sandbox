@@ -9,6 +9,7 @@ description: "Integrate Claude Code with your GitHub workflows for automated cod
 tags:
   - "clippings"
 ---
+
 Claude Code GitHub Actions brings AI-powered automation to your GitHub workflow. With a simple `@claude` mention in any PR or issue, Claude can analyze your code, create pull requests, implement features, and fix bugs - all while following your project’s standards.
 
 Claude Code GitHub Actions is currently in beta. Features and functionality may evolve as we refine the experience.
@@ -53,7 +54,7 @@ This command will guide you through setting up the GitHub app and required secre
 If the `/install-github-app` command fails or you prefer manual setup, please follow these manual setup instructions:
 
 1. **Install the Claude GitHub app** to your repository: [https://github.com/apps/claude](https://github.com/apps/claude)
-2. **Add ANTHROPIC\_API\_KEY** to your repository secrets ([Learn how to use secrets in GitHub Actions](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions))
+2. **Add ANTHROPIC_API_KEY** to your repository secrets ([Learn how to use secrets in GitHub Actions](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions))
 3. **Copy the workflow file** from [examples/claude.yml](https://github.com/anthropics/claude-code-action/blob/main/examples/claude.yml) into your repository’s `.github/workflows/`
 
 ## Example use cases
@@ -136,7 +137,7 @@ This is the default workflow created by the installer. It enables Claude to resp
 name: Claude PR Creation
 on:
   issue_comment:
-    types: [created]  # Triggers when someone comments on an issue or PR
+    types: [created] # Triggers when someone comments on an issue or PR
 
 jobs:
   create-pr:
@@ -151,24 +152,24 @@ jobs:
 
           # Define which tools Claude can use
           allowed_tools: [
-            # Git inspection commands (read-only)
-            "Bash(git status)",
-            "Bash(git log)",
-            "Bash(git show)",
-            "Bash(git blame)",
-            "Bash(git reflog)",
-            "Bash(git stash list)",
-            "Bash(git ls-files)",
-            "Bash(git branch)",
-            "Bash(git tag)",
-            "Bash(git diff)",
+              # Git inspection commands (read-only)
+              "Bash(git status)",
+              "Bash(git log)",
+              "Bash(git show)",
+              "Bash(git blame)",
+              "Bash(git reflog)",
+              "Bash(git stash list)",
+              "Bash(git ls-files)",
+              "Bash(git branch)",
+              "Bash(git tag)",
+              "Bash(git diff)",
 
-            # File exploration tools
-            "View",        # Read file contents
-            "GlobTool",    # Find files by pattern
-            "GrepTool",    # Search file contents
-            "BatchTool"    # Run multiple tools in parallel
-          ]
+              # File exploration tools
+              "View", # Read file contents
+              "GlobTool", # Find files by pattern
+              "GrepTool", # Search file contents
+              "BatchTool", # Run multiple tools in parallel
+            ]
 
           # Your Anthropic API key (stored as a GitHub secret)
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -183,7 +184,7 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize]  # Runs on new PRs and updates
+    types: [opened, synchronize] # Runs on new PRs and updates
 
 jobs:
   code-review:
@@ -193,7 +194,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch full history for accurate diffs
+          fetch-depth: 0 # Fetch full history for accurate diffs
 
       - name: Run Code Review with Claude
         id: code-review
@@ -204,12 +205,12 @@ jobs:
 
           # Limited tools for safer review operations
           allowed_tools: [
-            "Bash(git diff --name-only HEAD~1)",  # List changed files
-            "Bash(git diff HEAD~1)",              # See actual changes
-            "View",                               # Read file contents
-            "GlobTool",                          # Find related files
-            "GrepTool"                           # Search for patterns
-          ]
+              "Bash(git diff --name-only HEAD~1)", # List changed files
+              "Bash(git diff HEAD~1)", # See actual changes
+              "View", # Read file contents
+              "GlobTool", # Find related files
+              "GrepTool", # Search for patterns
+            ]
 
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
@@ -229,14 +230,14 @@ Before setting up Claude Code GitHub Actions with cloud providers, you need:
 1. A Google Cloud Project with Vertex AI enabled
 2. Workload Identity Federation configured for GitHub Actions
 3. A service account with the required permissions
-4. A GitHub App (recommended) or use the default GITHUB\_TOKEN
+4. A GitHub App (recommended) or use the default GITHUB_TOKEN
 
 #### For AWS Bedrock:
 
 1. An AWS account with Amazon Bedrock enabled
 2. GitHub OIDC Identity Provider configured in AWS
 3. An IAM role with Bedrock permissions
-4. A GitHub App (recommended) or use the default GITHUB\_TOKEN
+4. A GitHub App (recommended) or use the default GITHUB_TOKEN
 
 ## Troubleshooting
 
@@ -256,14 +257,14 @@ Confirm API key is valid and has sufficient permissions. For Bedrock/Vertex, che
 
 The Claude Code Action supports these key parameters:
 
-| Parameter | Description | Required |
-| --- | --- | --- |
-| `prompt` | The prompt to send to Claude | Yes\* |
-| `prompt_file` | Path to file containing prompt | Yes\* |
-| `allowed_tools` | Array of allowed tools | No |
-| `anthropic_api_key` | Anthropic API key | Yes\*\* |
-| `max_turns` | Maximum conversation turns | No |
-| `timeout_minutes` | Execution timeout | No |
+| Parameter           | Description                    | Required |
+| ------------------- | ------------------------------ | -------- |
+| `prompt`            | The prompt to send to Claude   | Yes\*    |
+| `prompt_file`       | Path to file containing prompt | Yes\*    |
+| `allowed_tools`     | Array of allowed tools         | No       |
+| `anthropic_api_key` | Anthropic API key              | Yes\*\*  |
+| `max_turns`         | Maximum conversation turns     | No       |
+| `timeout_minutes`   | Execution timeout              | No       |
 
 \*Either `prompt` or `prompt_file` required  
 \*\*Required for direct Anthropic API, not for Bedrock/Vertex

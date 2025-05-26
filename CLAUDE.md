@@ -9,15 +9,18 @@ This is the Claude Code Sandbox project - a CLI tool that runs Claude Code insta
 ## Common Development Commands
 
 ### Build and Development
+
 - `npm run build` - Compile TypeScript to JavaScript (output in `dist/`)
 - `npm run dev` - Watch mode for TypeScript compilation
 - `npm start` - Run the CLI tool
 
 ### Testing and Quality
+
 - `npm run lint` - Run ESLint on TypeScript files
 - `npm test` - Run Jest tests
 
 ### Container Management
+
 - `npm run purge-containers` - Remove all Claude Sandbox containers and images
 
 ## Architecture
@@ -25,25 +28,30 @@ This is the Claude Code Sandbox project - a CLI tool that runs Claude Code insta
 ### Core Components
 
 1. **CLI Entry Point** (`src/cli.ts`)
+
    - Command-line interface using Commander.js
    - Handles options parsing and main flow orchestration
 
 2. **Container Management** (`src/container.ts`)
+
    - Docker container lifecycle management using dockerode
    - Builds images, creates containers, handles streams
    - Manages volume mounts for credentials and workspace
 
 3. **Git Integration** (`src/git-monitor.ts`)
+
    - Monitors git repository for new commits
    - Uses simple-git for operations
    - Provides real-time notifications of Claude's commits
 
 4. **Credential Discovery** (`src/credentials.ts`)
+
    - Automatically discovers Claude API keys (Anthropic, AWS Bedrock, Google Vertex)
    - Discovers GitHub credentials (CLI auth, SSH keys)
    - Mounts credentials read-only into containers
 
 5. **Configuration** (`src/config.ts`)
+
    - Loads and validates configuration from `claude-sandbox.config.json`
    - Manages Docker settings, environment variables, and Claude parameters
 
@@ -63,6 +71,7 @@ This is the Claude Code Sandbox project - a CLI tool that runs Claude Code insta
 ## Configuration
 
 The tool looks for `claude-sandbox.config.json` in the working directory. Key options:
+
 - `dockerImage`: Base image name
 - `dockerfile`: Path to custom Dockerfile
 - `environment`: Additional environment variables

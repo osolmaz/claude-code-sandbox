@@ -9,6 +9,7 @@ description: "Learn about Claude Code, an agentic coding tool made by Anthropic.
 tags:
   - "clippings"
 ---
+
 Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster through natural language commands. By integrating directly with your development environment, Claude Code streamlines your workflow without requiring additional servers or complex setup.
 
 Claude Code’s key capabilities include:

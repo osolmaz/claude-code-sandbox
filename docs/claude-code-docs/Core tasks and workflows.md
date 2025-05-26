@@ -9,6 +9,7 @@ description: "Explore Claude Code's powerful features for editing, searching, te
 tags:
   - "clippings"
 ---
+
 Claude Code operates directly in your terminal, understanding your project context and taking real actions. No need to manually add files to context - Claude will explore your codebase as needed.
 
 ## Understand unfamiliar code

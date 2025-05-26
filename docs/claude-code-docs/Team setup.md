@@ -9,6 +9,7 @@ description: "Learn how to onboard your team to Claude Code, including user mana
 tags:
   - "clippings"
 ---
+
 ## User management
 
 Setting up Claude Code requires access to Anthropic models. For teams, you can set up Claude Code access in one of three ways:
@@ -21,16 +22,16 @@ Setting up Claude Code requires access to Anthropic models. For teams, you can s
 
 1. Use your existing Anthropic Console account or create a new Anthropic Console account
 2. You can add users through either method below:
-	- Bulk invite users from within the Console (Console -> Settings -> Members -> Invite)
-	- [Set up SSO](https://support.anthropic.com/en/articles/10280258-setting-up-single-sign-on-on-the-api-console)
+   - Bulk invite users from within the Console (Console -> Settings -> Members -> Invite)
+   - [Set up SSO](https://support.anthropic.com/en/articles/10280258-setting-up-single-sign-on-on-the-api-console)
 3. When inviting users, they need one of the following roles:
-	- “Claude Code” role means users can only create Claude Code API keys
-	- “Developer” role means users can create any kind of API key
+   - “Claude Code” role means users can only create Claude Code API keys
+   - “Developer” role means users can create any kind of API key
 4. Each invited user needs to complete these steps:
-	- Accept the Console invite
-	- [Check system requirements](https://docs.anthropic.com/en/docs/claude-code/getting-started#check-system-requirements)
-	- [Install Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview#install-and-authenticate)
-	- Login with Console account credentials
+   - Accept the Console invite
+   - [Check system requirements](https://docs.anthropic.com/en/docs/claude-code/getting-started#check-system-requirements)
+   - [Install Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview#install-and-authenticate)
+   - Login with Console account credentials
 
 **To set up Claude Code access for your team via Bedrock or Vertex:**
 
@@ -51,13 +52,13 @@ We designed Claude Code to be transparent and secure. For example, we allow the 
 Agentic systems are fundamentally different from AI chat experiences since agents are able to call tools that interact with the real world and act for longer periods of time. Agentic systems are non-deterministic and we have a number of built in protections to mitigate risks for users.
 
 1. **Prompt injection** is when model inputs alter model behavior in an undesired way. To reduce the risk of this happening, we’ve added a few in-product mitigations:
-	- Tools that make network requests require user approval by default
-	- Web fetch uses a separate context window, to avoid injecting potentially malicious prompts into the main context window
-	- The first time you run Claude Code in a new codebase, we will prompt you to verify that you trust the code
-	- The first time you see new MCP servers (configured via `.mcp.json`), we will prompt you to verify that you trust the servers
-	- When we detect a bash command with potential command injection (as a result of prompt injection), we will ask users to manually approve the command even if they have allowlisted it
-	- If we cannot reliably match a bash command to an allowlisted permission, we fail closed and prompt users for manual approval
-	- When the model generates complex bash commands, we generate natural language descriptions for users, so that they understand what the command does
+   - Tools that make network requests require user approval by default
+   - Web fetch uses a separate context window, to avoid injecting potentially malicious prompts into the main context window
+   - The first time you run Claude Code in a new codebase, we will prompt you to verify that you trust the code
+   - The first time you see new MCP servers (configured via `.mcp.json`), we will prompt you to verify that you trust the servers
+   - When we detect a bash command with potential command injection (as a result of prompt injection), we will ask users to manually approve the command even if they have allowlisted it
+   - If we cannot reliably match a bash command to an allowlisted permission, we fail closed and prompt users for manual approval
+   - When the model generates complex bash commands, we generate natural language descriptions for users, so that they understand what the command does
 2. **Prompt fatigue.** We support allowlisting frequently used safe commands per-user, per-codebase, or per-organization. We also let you switch into Accept Edits mode to accept many edits at a time, focusing permission prompts on tools that may have side effects (eg. bash)
 
 Ultimately, Claude Code only has as many permissions as the user who is guiding it, and users are responsible for making sure the proposed code and commands are safe.
@@ -88,11 +89,11 @@ When users run the `/bug` command, a copy of their full conversation history inc
 
 By default, we disable all non-essential traffic (including error reporting, telemetry, and bug reporting functionality) when using Bedrock or Vertex. You can also opt out of all of these at once by setting the `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` environment variable. Here are the full default behaviors:
 
-| Service | Anthropic API | Vertex API | Bedrock API |
-| --- | --- | --- | --- |
-| **Statsig (Metrics)** | Default on.   `DISABLE_TELEMETRY=1` to disable. | Default off.   `CLAUDE_CODE_USE_VERTEX` must be 1. | Default off.   `CLAUDE_CODE_USE_BEDROCK` must be 1. |
-| **Sentry (Errors)** | Default on.   `DISABLE_ERROR_REPORTING=1` to disable. | Default off.   `CLAUDE_CODE_USE_VERTEX` must be 1. | Default off.   `CLAUDE_CODE_USE_BEDROCK` must be 1. |
-| **Anthropic API (`/bug` reports)** | Default on.   `DISABLE_BUG_COMMAND=1` to disable. | Default off.   `CLAUDE_CODE_USE_VERTEX` must be 1. | Default off.   `CLAUDE_CODE_USE_BEDROCK` must be 1. |
+| Service                            | Anthropic API                                       | Vertex API                                       | Bedrock API                                       |
+| ---------------------------------- | --------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------- |
+| **Statsig (Metrics)**              | Default on. `DISABLE_TELEMETRY=1` to disable.       | Default off. `CLAUDE_CODE_USE_VERTEX` must be 1. | Default off. `CLAUDE_CODE_USE_BEDROCK` must be 1. |
+| **Sentry (Errors)**                | Default on. `DISABLE_ERROR_REPORTING=1` to disable. | Default off. `CLAUDE_CODE_USE_VERTEX` must be 1. | Default off. `CLAUDE_CODE_USE_BEDROCK` must be 1. |
+| **Anthropic API (`/bug` reports)** | Default on. `DISABLE_BUG_COMMAND=1` to disable.     | Default off. `CLAUDE_CODE_USE_VERTEX` must be 1. | Default off. `CLAUDE_CODE_USE_BEDROCK` must be 1. |
 
 All environment variables can be checked into `settings.json` ([read more](https://docs.anthropic.com/en/docs/claude-code/settings#configuration-hierarchy)).
 

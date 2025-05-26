@@ -9,17 +9,18 @@ description: "Learn how to manage Claude Code's memory across sessions with diff
 tags:
   - "clippings"
 ---
+
 Claude Code can remember your preferences across sessions, like style guidelines and common commands in your workflow.
 
 ## Determine memory type
 
 Claude Code offers three memory locations, each serving a different purpose:
 
-| Memory Type | Location | Purpose | Use Case Examples |
-| --- | --- | --- | --- |
-| **Project memory** | `./CLAUDE.md` | Team-shared instructions for the project | Project architecture, coding standards, common workflows |
-| **User memory** | `~/.claude/CLAUDE.md` | Personal preferences for all projects | Code styling preferences, personal tooling shortcuts |
-| **Project memory (local)** | `./CLAUDE.local.md` | Personal project-specific preferences | *(Deprecated, see below)* Your sandbox URLs, preferred test data |
+| Memory Type                | Location              | Purpose                                  | Use Case Examples                                                |
+| -------------------------- | --------------------- | ---------------------------------------- | ---------------------------------------------------------------- |
+| **Project memory**         | `./CLAUDE.md`         | Team-shared instructions for the project | Project architecture, coding standards, common workflows         |
+| **User memory**            | `~/.claude/CLAUDE.md` | Personal preferences for all projects    | Code styling preferences, personal tooling shortcuts             |
+| **Project memory (local)** | `./CLAUDE.local.md`   | Personal project-specific preferences    | _(Deprecated, see below)_ Your sandbox URLs, preferred test data |
 
 All memory files are automatically loaded into Claude Code’s context when launched.
 
@@ -35,7 +36,7 @@ Imported files can recursively import additional files, with a max-depth of 5 ho
 
 ## How Claude looks up memories
 
-Claude Code reads memories recursively: starting in the cwd, Claude Code recurses up to */* and reads any CLAUDE.md or CLAUDE.local.md files it finds. This is especially convenient when working in large repositories where you run Claude Code in *foo/bar/*, and have memories in both *foo/CLAUDE.md* and *foo/bar/CLAUDE.md*.
+Claude Code reads memories recursively: starting in the cwd, Claude Code recurses up to _/_ and reads any CLAUDE.md or CLAUDE.local.md files it finds. This is especially convenient when working in large repositories where you run Claude Code in _foo/bar/_, and have memories in both _foo/CLAUDE.md_ and _foo/bar/CLAUDE.md_.
 
 Claude will also discover CLAUDE.md nested in subtrees under your current working directory. Instead of loading them at launch, they are only included when Claude reads files in those subtrees.
 

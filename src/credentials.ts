@@ -1,9 +1,9 @@
-import fs from 'fs/promises';
-import path from 'path';
-import os from 'os';
-import { execSync } from 'child_process';
-import { Credentials } from './types';
-import chalk from 'chalk';
+import fs from "fs/promises";
+import path from "path";
+import os from "os";
+import { execSync } from "child_process";
+import { Credentials } from "./types";
+import chalk from "chalk";
 
 export class CredentialManager {
   async discover(): Promise<Credentials> {
@@ -14,7 +14,11 @@ export class CredentialManager {
       credentials.claude = await this.discoverClaudeCredentials();
     } catch {
       // Claude credentials are optional - user can set them in the container
-      console.log(chalk.yellow('No Claude credentials found on host. You can set them in the container.'));
+      console.log(
+        chalk.yellow(
+          "No Claude credentials found on host. You can set them in the container.",
+        ),
+      );
     }
 
     // Discover GitHub credentials
@@ -23,24 +27,24 @@ export class CredentialManager {
     return credentials;
   }
 
-  private async discoverClaudeCredentials(): Promise<Credentials['claude']> {
+  private async discoverClaudeCredentials(): Promise<Credentials["claude"]> {
     // Check environment variables
     if (process.env.ANTHROPIC_API_KEY) {
       return {
-        type: 'api_key',
+        type: "api_key",
         value: process.env.ANTHROPIC_API_KEY,
       };
     }
 
     // Check for ~/.claude.json configuration
     try {
-      const claudeConfigPath = path.join(os.homedir(), '.claude.json');
-      const configContent = await fs.readFile(claudeConfigPath, 'utf-8');
+      const claudeConfigPath = path.join(os.homedir(), ".claude.json");
+      const configContent = await fs.readFile(claudeConfigPath, "utf-8");
       const config = JSON.parse(configContent);
 
       if (config.api_key) {
         return {
-          type: 'api_key',
+          type: "api_key",
           value: config.api_key,
         };
       }
@@ -49,19 +53,19 @@ export class CredentialManager {
     }
 
     // Check for Bedrock configuration
-    if (process.env.CLAUDE_CODE_USE_BEDROCK === '1') {
+    if (process.env.CLAUDE_CODE_USE_BEDROCK === "1") {
       return {
-        type: 'bedrock',
-        value: 'bedrock',
-        region: process.env.AWS_REGION || 'us-east-1',
+        type: "bedrock",
+        value: "bedrock",
+        region: process.env.AWS_REGION || "us-east-1",
       };
     }
 
     // Check for Vertex configuration
-    if (process.env.CLAUDE_CODE_USE_VERTEX === '1') {
+    if (process.env.CLAUDE_CODE_USE_VERTEX === "1") {
       return {
-        type: 'vertex',
-        value: 'vertex',
+        type: "vertex",
+        value: "vertex",
         project: process.env.GOOGLE_CLOUD_PROJECT,
       };
     }
@@ -70,25 +74,33 @@ export class CredentialManager {
     const oauthToken = await this.findOAuthToken();
     if (oauthToken) {
       return {
-        type: 'oauth',
+        type: "oauth",
         value: oauthToken,
       };
     }
 
-    throw new Error('No Claude credentials found. Please set ANTHROPIC_API_KEY or create ~/.claude.json with your API key.');
+    throw new Error(
+      "No Claude credentials found. Please set ANTHROPIC_API_KEY or create ~/.claude.json with your API key.",
+    );
   }
 
   private async findOAuthToken(): Promise<string | null> {
     // Check common locations for Claude OAuth tokens
     const possiblePaths = [
-      path.join(os.homedir(), '.claude', 'auth.json'),
-      path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'auth.json'),
-      path.join(os.homedir(), '.config', 'claude', 'auth.json'),
+      path.join(os.homedir(), ".claude", "auth.json"),
+      path.join(
+        os.homedir(),
+        "Library",
+        "Application Support",
+        "Claude",
+        "auth.json",
+      ),
+      path.join(os.homedir(), ".config", "claude", "auth.json"),
     ];
 
     for (const authPath of possiblePaths) {
       try {
-        const content = await fs.readFile(authPath, 'utf-8');
+        const content = await fs.readFile(authPath, "utf-8");
         const auth = JSON.parse(content);
         if (auth.access_token) {
           return auth.access_token;
@@ -99,11 +111,14 @@ export class CredentialManager {
     }
 
     // Try to get from system keychain (macOS)
-    if (process.platform === 'darwin') {
+    if (process.platform === "darwin") {
       try {
-        const token = execSync('security find-generic-password -s "claude-auth" -w 2>/dev/null', {
-          encoding: 'utf-8',
-        }).trim();
+        const token = execSync(
+          'security find-generic-password -s "claude-auth" -w 2>/dev/null',
+          {
+            encoding: "utf-8",
+          },
+        ).trim();
         if (token) return token;
       } catch {
         // Keychain access failed
@@ -113,8 +128,8 @@ export class CredentialManager {
     return null;
   }
 
-  private async discoverGitHubCredentials(): Promise<Credentials['github']> {
-    const github: Credentials['github'] = {};
+  private async discoverGitHubCredentials(): Promise<Credentials["github"]> {
+    const github: Credentials["github"] = {};
 
     // Check for GitHub token in environment
     if (process.env.GITHUB_TOKEN) {
@@ -124,7 +139,9 @@ export class CredentialManager {
     } else {
       // Try to get from gh CLI
       try {
-        const token = execSync('gh auth token 2>/dev/null', { encoding: 'utf-8' }).trim();
+        const token = execSync("gh auth token 2>/dev/null", {
+          encoding: "utf-8",
+        }).trim();
         if (token) github.token = token;
       } catch {
         // gh CLI not available or not authenticated
@@ -133,7 +150,10 @@ export class CredentialManager {
 
     // Get git config
     try {
-      const gitConfig = await fs.readFile(path.join(os.homedir(), '.gitconfig'), 'utf-8');
+      const gitConfig = await fs.readFile(
+        path.join(os.homedir(), ".gitconfig"),
+        "utf-8",
+      );
       github.gitConfig = gitConfig;
     } catch {
       // No git config found

@@ -1,23 +1,27 @@
 ## Claude Sandbox Requirements Summary
 
 ### Core Concept
+
 Claude-sandbox is a tool that runs Claude Code as an interactive agent inside Docker containers, providing a sandboxed environment for autonomous coding with git integration.
 
 ### Key Functional Requirements
 
 #### 1. **Launch Behavior**
+
 - Simple command: just type `claude-sandbox` in any git repository
 - No pre-specified task - users interact with Claude directly after launch
 - Claude Code runs as an interactive REPL (like a smart terminal)
 - Maintains persistent context throughout the session (never exits)
 
 #### 2. **Sandboxing**
+
 - Runs inside Docker container for complete isolation
 - Claude has full permissions to run any command (since it's sandboxed)
 - No permission prompts - everything is auto-allowed
 - Environment can be customized via Dockerfile configuration
 
 #### 3. **Credential Management**
+
 - Automatically discovers and forwards Claude credentials from host:
   - Claude Max OAuth tokens
   - Anthropic API keys
@@ -28,6 +32,7 @@ Claude-sandbox is a tool that runs Claude Code as an interactive agent inside Do
   - Git configuration
 
 #### 4. **Git Workflow**
+
 - **CRITICAL**: NO branch switching happens on the host machine - EVER
 - Host repository stays on whatever branch the user is currently on
 - **CRITICAL**: Files must be COPIED into the container, NOT mounted
@@ -41,6 +46,7 @@ Claude-sandbox is a tool that runs Claude Code as an interactive agent inside Do
 - Git wrapper prevents branch switching operations within container
 
 #### 5. **Change Detection & Review**
+
 - Real-time monitoring for new commits
 - When commit detected:
   - User gets notification
@@ -54,6 +60,7 @@ Claude-sandbox is a tool that runs Claude Code as an interactive agent inside Do
   - Exit
 
 #### 6. **Asynchronous Operation**
+
 - Multiple containers can run simultaneously
 - Each gets its own branch and isolated environment
 - Fire-and-forget model for parallel work
@@ -61,18 +68,21 @@ Claude-sandbox is a tool that runs Claude Code as an interactive agent inside Do
 ### Technical Implementation Details
 
 #### Docker Container Setup
+
 - Base image with all necessary tools (git, gh CLI, build tools)
 - Claude Code installed globally
 - SSH configured for GitHub
 - Auto-permission wrapper to bypass all prompts
 
 #### Monitoring System
+
 - Watches for file changes
 - Detects git commits
 - Tracks Claude's activity state
 - Determines when tasks are complete
 
 #### User Experience Flow
+
 1. Run `claude-sandbox` in repo
 2. System creates new branch
 3. Docker container starts with Claude Code
@@ -83,6 +93,7 @@ Claude-sandbox is a tool that runs Claude Code as an interactive agent inside Do
 8. Choose to push/PR after review
 
 ### Design Principles
+
 - **Zero configuration** - works out of the box
 - **Natural interaction** - chat with Claude like normal
 - **Full visibility** - see all changes before they leave the machine

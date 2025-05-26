@@ -5,6 +5,7 @@ This document explains how to pass environment variables to Claude Sandbox conta
 ## Overview
 
 Claude Sandbox supports two ways to pass environment variables to containers:
+
 1. **Inline environment variables** in the configuration file
 2. **Loading from a `.env` file**
 
@@ -88,6 +89,7 @@ Environment variables are loaded in this order (later sources override earlier o
 ### Using .env File
 
 Create `.env`:
+
 ```bash
 # Development settings
 DATABASE_URL=postgresql://localhost:5432/myapp
@@ -97,6 +99,7 @@ DEBUG=true
 ```
 
 Configure `claude-sandbox.config.json`:
+
 ```json
 {
   "envFile": ".env",
@@ -111,6 +114,7 @@ Configure `claude-sandbox.config.json`:
 For different environments, use different config files:
 
 `claude-sandbox.dev.json`:
+
 ```json
 {
   "envFile": ".env.development",
@@ -121,6 +125,7 @@ For different environments, use different config files:
 ```
 
 `claude-sandbox.prod.json`:
+
 ```json
 {
   "envFile": ".env.production",
@@ -131,6 +136,7 @@ For different environments, use different config files:
 ```
 
 Run with:
+
 ```bash
 claude-sandbox --config claude-sandbox.dev.json
 ```
@@ -138,6 +144,7 @@ claude-sandbox --config claude-sandbox.dev.json
 ## Security Best Practices
 
 1. **Never commit sensitive data**: Add `.env` files to `.gitignore`
+
    ```gitignore
    .env
    .env.*
@@ -145,6 +152,7 @@ claude-sandbox --config claude-sandbox.dev.json
    ```
 
 2. **Use placeholder values** in committed config files:
+
    ```json
    {
      "environment": {
@@ -154,6 +162,7 @@ claude-sandbox --config claude-sandbox.dev.json
    ```
 
 3. **Use .env files** for sensitive data:
+
    - Keep `.env` files local
    - Use `.env.example` with dummy values for documentation
 
@@ -171,6 +180,7 @@ claude-sandbox --config claude-sandbox.dev.json
 These variables have special meaning in Claude Sandbox:
 
 ### Claude Configuration
+
 - `ANTHROPIC_API_KEY` - Claude API key
 - `CLAUDE_CODE_USE_BEDROCK` - Use AWS Bedrock
 - `CLAUDE_CODE_USE_VERTEX` - Use Google Vertex
@@ -178,12 +188,14 @@ These variables have special meaning in Claude Sandbox:
 - `BASH_MAX_TIMEOUT_MS` - Bash command timeout
 
 ### GitHub Configuration
+
 - `GITHUB_TOKEN` - GitHub authentication token
 - `GH_TOKEN` - Alternative GitHub token variable
 - `GIT_AUTHOR_NAME` - Git commit author name
 - `GIT_AUTHOR_EMAIL` - Git commit author email
 
 ### System Configuration
+
 - `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` - Always set to 1
 
 ## Debugging
@@ -201,6 +213,7 @@ echo $MY_VAR
 ## Common Use Cases
 
 ### API Keys and Secrets
+
 ```json
 {
   "envFile": ".env.secrets",
@@ -211,6 +224,7 @@ echo $MY_VAR
 ```
 
 ### Database Configuration
+
 ```json
 {
   "environment": {
@@ -223,6 +237,7 @@ echo $MY_VAR
 ```
 
 ### Feature Flags
+
 ```json
 {
   "environment": {
@@ -233,6 +248,7 @@ echo $MY_VAR
 ```
 
 ### Development Tools
+
 ```json
 {
   "environment": {

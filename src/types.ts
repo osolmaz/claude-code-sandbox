@@ -25,7 +25,7 @@ export interface SandboxConfig {
 
 export interface Credentials {
   claude?: {
-    type: 'api_key' | 'oauth' | 'bedrock' | 'vertex';
+    type: "api_key" | "oauth" | "bedrock" | "vertex";
     value: string;
     region?: string;
     project?: string;

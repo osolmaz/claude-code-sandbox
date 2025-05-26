@@ -9,31 +9,32 @@ description: "Learn about Claude Code's permission system, tools access, and sec
 tags:
   - "clippings"
 ---
+
 Claude Code uses a tiered permission system to balance power and safety:
 
-| Tool Type | Example | Approval Required | ”Yes, don’t ask again” Behavior |
-| --- | --- | --- | --- |
-| Read-only | File reads, LS, Grep | No | N/A |
-| Bash Commands | Shell execution | Yes | Permanently per project directory and command |
-| File Modification | Edit/write files | Yes | Until session end |
+| Tool Type         | Example              | Approval Required | ”Yes, don’t ask again” Behavior               |
+| ----------------- | -------------------- | ----------------- | --------------------------------------------- |
+| Read-only         | File reads, LS, Grep | No                | N/A                                           |
+| Bash Commands     | Shell execution      | Yes               | Permanently per project directory and command |
+| File Modification | Edit/write files     | Yes               | Until session end                             |
 
 ## Tools available to Claude
 
 Claude Code has access to a set of powerful tools that help it understand and modify your codebase:
 
-| Tool | Description | Permission Required |
-| --- | --- | --- |
-| **Agent** | Runs a sub-agent to handle complex, multi-step tasks | No |
-| **Bash** | Executes shell commands in your environment | Yes |
-| **Glob** | Finds files based on pattern matching | No |
-| **Grep** | Searches for patterns in file contents | No |
-| **LS** | Lists files and directories | No |
-| **Read** | Reads the contents of files | No |
-| **Edit** | Makes targeted edits to specific files | Yes |
-| **Write** | Creates or overwrites files | Yes |
-| **NotebookEdit** | Modifies Jupyter notebook cells | Yes |
-| **NotebookRead** | Reads and displays Jupyter notebook contents | No |
-| **WebFetch** | Fetches content from a specified URL | Yes |
+| Tool             | Description                                          | Permission Required |
+| ---------------- | ---------------------------------------------------- | ------------------- |
+| **Agent**        | Runs a sub-agent to handle complex, multi-step tasks | No                  |
+| **Bash**         | Executes shell commands in your environment          | Yes                 |
+| **Glob**         | Finds files based on pattern matching                | No                  |
+| **Grep**         | Searches for patterns in file contents               | No                  |
+| **LS**           | Lists files and directories                          | No                  |
+| **Read**         | Reads the contents of files                          | No                  |
+| **Edit**         | Makes targeted edits to specific files               | Yes                 |
+| **Write**        | Creates or overwrites files                          | Yes                 |
+| **NotebookEdit** | Modifies Jupyter notebook cells                      | Yes                 |
+| **NotebookRead** | Reads and displays Jupyter notebook contents         | No                  |
+| **WebFetch**     | Fetches content from a specified URL                 | Yes                 |
 
 Permission rules can be configured using `/allowed-tools` or in [permission settings](https://docs.anthropic.com/en/docs/claude-code/settings#permissions).
 

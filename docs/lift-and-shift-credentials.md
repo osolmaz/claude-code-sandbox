@@ -17,6 +17,7 @@ security find-generic-password -s "Claude Code-credentials" -w
 ```
 
 The credentials are stored as JSON:
+
 ```json
 {
   "claudeAiOauth": {
@@ -33,6 +34,7 @@ These credentials are copied to: `/home/claude/.claude/.credentials.json`
 ### API Key Configuration (Priority 2)
 
 If you have an API key stored in `~/.claude.json`:
+
 ```json
 {
   "api_key": "sk-ant-api03-..."
@@ -44,6 +46,7 @@ This file is copied to: `/home/claude/.claude.json`
 ### Environment Variable (Priority 3)
 
 If `ANTHROPIC_API_KEY` is set in your environment, it's passed to the container:
+
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-api03-..."
 ```
@@ -55,6 +58,7 @@ On non-macOS systems, if `~/.claude/` directory exists, it's copied entirely to 
 ## File Permissions
 
 All copied credential files are set with appropriate permissions:
+
 - `.claude/` directory: `700` (owner read/write/execute only)
 - `.credentials.json`: `600` (owner read/write only)
 - `.claude.json`: `644` (owner read/write, others read)
@@ -69,19 +73,25 @@ All copied credential files are set with appropriate permissions:
 ## Troubleshooting
 
 ### macOS Keychain Access Denied
+
 If you see "No Claude credentials found in macOS Keychain", ensure:
+
 1. You've logged into Claude Code on your host machine
 2. Terminal has Keychain access permissions
 3. The credential name is exactly "Claude Code-credentials"
 
 ### Missing Credentials
+
 If Claude Code prompts for login in the container:
+
 1. Check if credentials exist on your host
 2. Verify file permissions in the container
 3. Try setting `ANTHROPIC_API_KEY` as a fallback
 
 ### Manual Credential Setup
+
 You can manually copy credentials into a running container:
+
 ```bash
 docker exec -it <container-id> bash
 # Inside container:

@@ -9,6 +9,7 @@ description: "Practical examples and patterns for effectively using Claude Code 
 tags:
   - "clippings"
 ---
+
 This guide provides step-by-step tutorials for common workflows with Claude Code. Each tutorial includes clear instructions, example commands, and best practices to help you get the most from Claude Code.
 
 - [Resume previous conversations](https://docs.anthropic.com/en/docs/claude-code/tutorials#resume-previous-conversations)
@@ -209,11 +210,11 @@ Use third party MCP servers at your own risk. Make sure you trust the MCP server
 **Tips:**
 
 - Use the `-s` or `--scope` flag to specify where the configuration is stored:
-	- `local` (default): Available only to you in the current project (was called `project` in older versions)
-	- `project`: Shared with everyone in the project via `.mcp.json` file
-	- `user`: Available to you across all projects (was called `global` in older versions)
+  - `local` (default): Available only to you in the current project (was called `project` in older versions)
+  - `project`: Shared with everyone in the project via `.mcp.json` file
+  - `user`: Available to you across all projects (was called `global` in older versions)
 - Set environment variables with `-e` or `--env` flags (e.g., `-e KEY=value`)
-- Configure MCP server startup timeout using the MCP\_TIMEOUT environment variable (e.g., `MCP_TIMEOUT=10000 claude` sets a 10-second timeout)
+- Configure MCP server startup timeout using the MCP_TIMEOUT environment variable (e.g., `MCP_TIMEOUT=10000 claude` sets a 10-second timeout)
 - Check MCP server status any time using the `/mcp` command within Claude Code
 - MCP follows a client-server architecture where Claude Code (the client) can connect to multiple specialized servers
 
@@ -351,9 +352,9 @@ Claude Code supports custom slash commands that you can create to quickly execut
 - For long-running tasks, you can have Claude working in one worktree while you continue development in another
 - Use descriptive directory names to easily identify which task each worktree is for
 - Remember to initialize your development environment in each new worktree according to your project’s setup. Depending on your stack, this might include:
-	- JavaScript projects: Running dependency installation (`npm install`, `yarn`)
-	- Python projects: Setting up virtual environments or installing with package managers
-	- Other languages: Following your project’s standard setup process
+  - JavaScript projects: Running dependency installation (`npm install`, `yarn`)
+  - Python projects: Setting up virtual environments or installing with package managers
+  - Other languages: Following your project’s standard setup process
 
 ---
 

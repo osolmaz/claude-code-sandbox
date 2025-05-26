@@ -9,6 +9,7 @@ description: "Solutions for common issues with Claude Code installation and usag
 tags:
   - "clippings"
 ---
+
 ## Common installation issues
 
 When installing Claude Code with npm, you may encounter permission errors if your npm global prefix is not user writable (eg. `/usr`, or `/use/local`).
@@ -58,9 +59,9 @@ If you’ve already run a command that changed system directory permissions (suc
 6. Fix permissions:
 7. Reinstall affected packages (optional but recommended):
 8. Reboot:
-	```bash
-	reboot
-	```
+   ```bash
+   reboot
+   ```
 
 ##### Alternative Live USB Recovery Method:
 
@@ -68,9 +69,9 @@ If the recovery mode doesn’t work, you can use a live USB:
 
 1. Boot from a live USB (Ubuntu, Debian, or any Linux distribution)
 2. Find your system partition:
-	```bash
-	lsblk
-	```
+   ```bash
+   lsblk
+   ```
 3. Mount your system partition:
 4. If you have a separate boot partition, mount it too:
 5. Chroot into your system:

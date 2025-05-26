@@ -1,17 +1,17 @@
-import fs from 'fs/promises';
-import path from 'path';
-import os from 'os';
-import { SandboxConfig } from './types';
+import fs from "fs/promises";
+import path from "path";
+import os from "os";
+import { SandboxConfig } from "./types";
 
 const DEFAULT_CONFIG: SandboxConfig = {
-  dockerImage: 'claude-code-sandbox:latest',
+  dockerImage: "claude-code-sandbox:latest",
   detached: false,
   autoPush: true,
   autoCreatePR: true,
   autoStartClaude: true,
-  claudeConfigPath: path.join(os.homedir(), '.claude.json'),
+  claudeConfigPath: path.join(os.homedir(), ".claude.json"),
   setupCommands: [], // Example: ["npm install", "pip install -r requirements.txt"]
-  allowedTools: ['*'], // All tools allowed in sandbox
+  allowedTools: ["*"], // All tools allowed in sandbox
   // maxThinkingTokens: 100000,
   // bashTimeout: 600000, // 10 minutes
 };
@@ -19,7 +19,7 @@ const DEFAULT_CONFIG: SandboxConfig = {
 export async function loadConfig(configPath: string): Promise<SandboxConfig> {
   try {
     const fullPath = path.resolve(configPath);
-    const configContent = await fs.readFile(fullPath, 'utf-8');
+    const configContent = await fs.readFile(fullPath, "utf-8");
     const userConfig = JSON.parse(configContent);
 
     // Merge with defaults
@@ -33,7 +33,10 @@ export async function loadConfig(configPath: string): Promise<SandboxConfig> {
   }
 }
 
-export async function saveConfig(config: SandboxConfig, configPath: string): Promise<void> {
+export async function saveConfig(
+  config: SandboxConfig,
+  configPath: string,
+): Promise<void> {
   const fullPath = path.resolve(configPath);
   await fs.writeFile(fullPath, JSON.stringify(config, null, 2));
 }
