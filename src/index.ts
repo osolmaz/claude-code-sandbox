@@ -31,41 +31,71 @@ export class ClaudeSandbox {
     try {
       // Verify we're in a git repository
       await this.verifyGitRepo();
-      
+
       // Check current branch
       const currentBranch = await this.git.branchLocal();
       console.log(chalk.blue(`Current branch: ${currentBranch.current}`));
-      
+
       // Generate branch name (but don't switch yet)
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
       const branchName = `claude/${timestamp}-${Date.now()}`;
       console.log(chalk.blue(`Will create branch in container: ${branchName}`));
-      
+
       // Discover credentials
       const credentials = await this.credentialManager.discover();
       console.log(chalk.green('✓ Discovered credentials'));
-      
+
       // Prepare container environment
       const containerConfig = await this.prepareContainer(branchName, credentials);
-      
+
       // Start container
       const containerId = await this.containerManager.start(containerConfig);
       console.log(chalk.green(`✓ Started container: ${containerId.substring(0, 12)}`));
-      
+
       // Start monitoring for commits
       this.gitMonitor.on('commit', async (commit) => {
         await this.handleCommit(commit);
       });
-      
+
       await this.gitMonitor.start(branchName);
-      
+      console.log(chalk.blue('✓ Git monitoring started'));
+
       // Attach to container or run detached
       if (!this.config.detached) {
-        await this.containerManager.attach(containerId);
+        console.log(chalk.blue('Preparing to attach to container...'));
+
+        // Set up cleanup handler
+        const cleanup = async () => {
+          console.log(chalk.blue('\nShutting down...'));
+          await this.cleanup();
+          process.exit(0);
+        };
+
+        // Handle process signals
+        process.on('SIGINT', cleanup);
+        process.on('SIGTERM', cleanup);
+
+        try {
+          console.log(chalk.gray('About to call attach method...'));
+          await this.containerManager.attach(containerId, branchName);
+          console.log(chalk.gray('Attach method completed'));
+        } catch (error) {
+          console.error(chalk.red('Failed to attach to container:'), error);
+          await this.cleanup();
+          throw error;
+        }
       } else {
-        console.log(chalk.blue('Running in detached mode. Use docker attach to connect.'));
+        console.log(chalk.blue('Running in detached mode. Container is running in the background.'));
+        console.log(chalk.gray(`Container ID: ${containerId}`));
+        console.log(chalk.yellow('\nTo connect to the container, run:'));
+        console.log(chalk.white(`  docker attach ${containerId.substring(0, 12)}`));
+        console.log(chalk.yellow('\nOr use docker exec for a new shell:'));
+        console.log(chalk.white(`  docker exec -it ${containerId.substring(0, 12)} /bin/bash`));
+        console.log(chalk.yellow('\nTo stop the container:'));
+        console.log(chalk.white(`  docker stop ${containerId.substring(0, 12)}`));
+        console.log(chalk.gray('\nThe container will continue running until you stop it manually.'));
       }
-      
+
     } catch (error) {
       console.error(chalk.red('Error:'), error);
       throw error;
@@ -83,7 +113,7 @@ export class ClaudeSandbox {
   private async prepareContainer(branchName: string, credentials: any): Promise<any> {
     const workDir = process.cwd();
     const repoName = path.basename(workDir);
-    
+
     return {
       branchName,
       credentials,
@@ -96,14 +126,14 @@ export class ClaudeSandbox {
   private async handleCommit(commit: any): Promise<void> {
     // Show commit notification
     this.ui.showCommitNotification(commit);
-    
+
     // Show diff
     const diff = await this.git.diff(['HEAD~1', 'HEAD']);
     this.ui.showDiff(diff);
-    
+
     // Ask user what to do
     const action = await this.ui.askCommitAction();
-    
+
     switch (action) {
       case 'nothing':
         console.log(chalk.blue('Continuing...'));
@@ -128,7 +158,7 @@ export class ClaudeSandbox {
 
   private async pushBranchAndCreatePR(): Promise<void> {
     await this.pushBranch();
-    
+
     // Use gh CLI to create PR
     const { execSync } = require('child_process');
     try {

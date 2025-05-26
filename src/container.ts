@@ -16,29 +16,39 @@ export class ContainerManager {
   async start(containerConfig: any): Promise<string> {
     // Build or pull image
     await this.ensureImage();
-    
+
     // Create container
     const container = await this.createContainer(containerConfig);
     this.containers.set(container.id, container);
-    
+
     // Start container
     await container.start();
     console.log(chalk.green('✓ Container started successfully'));
-    
+
     // Copy working directory into container
     console.log(chalk.blue('Copying files into container...'));
-    await this.copyWorkingDirectory(container, containerConfig.workDir);
-    console.log(chalk.green('✓ Files copied successfully'));
-    
+    try {
+      await this._copyWorkingDirectory(container, containerConfig.workDir);
+      console.log(chalk.green('✓ Files copied successfully'));
+    } catch (error) {
+      console.error(chalk.red('File copy failed:'), error);
+      // Clean up container on failure
+      await container.stop().catch(() => {});
+      await container.remove().catch(() => {});
+      this.containers.delete(container.id);
+      throw error;
+    }
+
     // Give the container a moment to initialize
     await new Promise(resolve => setTimeout(resolve, 500));
-    
+    console.log(chalk.gray('Container initialization complete, returning container ID...'));
+
     return container.id;
   }
 
   private async ensureImage(): Promise<void> {
     const imageName = this.config.dockerImage || 'claude-code-sandbox:latest';
-    
+
     // Check if image already exists
     try {
       await this.docker.getImage(imageName).inspect();
@@ -47,7 +57,7 @@ export class ContainerManager {
     } catch (error) {
       console.log(chalk.blue(`Building image: ${imageName}...`));
     }
-    
+
     // Check if we need to build from Dockerfile
     if (this.config.dockerfile) {
       await this.buildImage(this.config.dockerfile, imageName);
@@ -114,6 +124,16 @@ else\\n\\
 fi' > /usr/local/bin/git && \\
     chmod +x /usr/local/bin/git
 
+# Create startup script
+RUN echo '#!/bin/bash\\n\\
+echo "Waiting for attachment..."\\n\\
+sleep 2\\n\\
+cd /workspace\\n\\
+git checkout -b "$1"\\n\\
+echo "Starting Claude Code on branch $1..."\\n\\
+exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
+    chmod +x /start-claude.sh
+
 # Set up entrypoint
 ENTRYPOINT ["/bin/bash", "-c"]
 `;
@@ -121,21 +141,21 @@ ENTRYPOINT ["/bin/bash", "-c"]
     // Build image from string
     const tarStream = require('tar-stream');
     const pack = tarStream.pack();
-    
+
     // Add Dockerfile to tar
     pack.entry({ name: 'Dockerfile' }, dockerfile, (err: any) => {
       if (err) throw err;
       pack.finalize();
     });
-    
+
     // Convert to buffer for docker
     const chunks: Buffer[] = [];
     pack.on('data', (chunk: any) => chunks.push(chunk));
-    
+
     await new Promise((resolve) => {
       pack.on('end', resolve);
     });
-    
+
     const tarBuffer = Buffer.concat(chunks);
     const buildStream = await this.docker.buildImage(tarBuffer as any, {
       t: imageName,
@@ -156,7 +176,7 @@ ENTRYPOINT ["/bin/bash", "-c"]
 
   private async buildImage(dockerfilePath: string, imageName: string): Promise<void> {
     const buildContext = path.dirname(dockerfilePath);
-    
+
     const buildStream = await this.docker.buildImage({
       context: buildContext,
       src: [path.basename(dockerfilePath)],
@@ -178,14 +198,14 @@ ENTRYPOINT ["/bin/bash", "-c"]
   }
 
   private async createContainer(containerConfig: any): Promise<Docker.Container> {
-    const { branchName, credentials, workDir } = containerConfig;
-    
+    const { credentials, workDir } = containerConfig;
+
     // Prepare environment variables
     const env = this.prepareEnvironment(credentials);
-    
+
     // Prepare volumes
     const volumes = this.prepareVolumes(workDir, credentials);
-    
+
     // Create container
     const container = await this.docker.createContainer({
       Image: this.config.dockerImage || 'claude-code-sandbox:latest',
@@ -197,20 +217,21 @@ ENTRYPOINT ["/bin/bash", "-c"]
         NetworkMode: 'bridge',
       },
       WorkingDir: '/workspace',
-      Cmd: [`cd /workspace && git checkout -b ${branchName} && exec claude --dangerously-skip-permissions`],
+      Cmd: ['/bin/bash', '-l'],
       AttachStdin: true,
       AttachStdout: true,
       AttachStderr: true,
       Tty: true,
       OpenStdin: true,
+      StdinOnce: false,
     });
-    
+
     return container;
   }
 
   private prepareEnvironment(credentials: Credentials): string[] {
     const env = [];
-    
+
     // Claude credentials
     if (credentials.claude) {
       switch (credentials.claude.type) {
@@ -231,12 +252,12 @@ ENTRYPOINT ["/bin/bash", "-c"]
           break;
       }
     }
-    
+
     // GitHub token
     if (credentials.github?.token) {
       env.push(`GITHUB_TOKEN=${credentials.github.token}`);
     }
-    
+
     // Additional config
     env.push('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1');
     if (this.config.maxThinkingTokens) {
@@ -245,197 +266,302 @@ ENTRYPOINT ["/bin/bash", "-c"]
     if (this.config.bashTimeout) {
       env.push(`BASH_MAX_TIMEOUT_MS=${this.config.bashTimeout}`);
     }
-    
+
     // Add custom environment variables
     if (this.config.environment) {
       Object.entries(this.config.environment).forEach(([key, value]) => {
         env.push(`${key}=${value}`);
       });
     }
-    
+
     return env;
   }
 
   private prepareVolumes(_workDir: string, credentials: Credentials): string[] {
-    // NO LONGER mounting the work directory - we'll copy files instead
+    // NO MOUNTING - we'll copy files instead
     const volumes: string[] = [];
-    
+
     // Mount SSH keys if available
     if (credentials.github?.sshKey) {
       volumes.push(`${process.env.HOME}/.ssh:/root/.ssh:ro`);
     }
-    
+
     // Mount git config if available
     if (credentials.github?.gitConfig) {
       volumes.push(`${process.env.HOME}/.gitconfig:/root/.gitconfig:ro`);
     }
-    
+
     // Add custom volumes
     if (this.config.volumes) {
       volumes.push(...this.config.volumes);
     }
-    
+
     return volumes;
   }
 
-  async attach(containerId: string): Promise<void> {
+  async attach(containerId: string, branchName?: string): Promise<void> {
     const container = this.containers.get(containerId);
     if (!container) {
       throw new Error('Container not found');
     }
-    
-    console.log(chalk.blue('Attaching to container...'));
-    
-    // Check container status first
-    const info = await container.inspect();
-    console.log(chalk.blue(`Container state: Running=${info.State.Running}, Status=${info.State.Status}`));
-    
+
+    console.log(chalk.blue('Connecting to container...'));
+
+    // Use provided branch name or generate one
+    const targetBranch = branchName || `claude/${new Date().toISOString().replace(/[:.]/g, '-').split('T')[0]}-${Date.now()}`;
+
+    // First, set up the git branch
     try {
-      const stream = await container.attach({
-        stream: true,
-        stdin: true,
-        stdout: true,
-        stderr: true,
+      console.log(chalk.gray('Setting up git branch...'));
+      const setupExec = await container.exec({
+        Cmd: ['/bin/bash', '-c', `cd /workspace && git config --global --add safe.directory /workspace && git checkout -b "${targetBranch}" && echo "✓ Created branch: ${targetBranch}"`],
+        AttachStdout: true,
+        AttachStderr: true,
       });
-      
-      // Set initial size
-      await container.resize({
-        w: process.stdout.columns || 80,
-        h: process.stdout.rows || 24,
-      }).catch(() => {}); // Ignore resize errors
-      
-      // Handle terminal resize
-      process.stdout.on('resize', () => {
-        container.resize({
-          w: process.stdout.columns,
-          h: process.stdout.rows,
-        }).catch(() => {}); // Ignore resize errors
+
+      const setupStream = await setupExec.start({});
+
+      // Wait for setup to complete
+      await new Promise<void>((resolve, reject) => {
+        let output = '';
+        setupStream.on('data', (chunk) => {
+          output += chunk.toString();
+          process.stdout.write(chunk);
+        });
+        setupStream.on('end', () => {
+          if (output.includes('✓ Created branch')) {
+            resolve();
+          } else {
+            reject(new Error('Branch creation failed'));
+          }
+        });
+        setupStream.on('error', reject);
       });
-      
-      // Connect streams
-      if (process.stdin.isTTY) {
-        process.stdin.setRawMode(true);
-      }
-      process.stdin.resume();
-      
-      // Use Docker's demux for proper stream handling
-      container.modem.demuxStream(stream, process.stdout, process.stderr);
-      
-      // Connect stdin
-      process.stdin.pipe(stream);
-      
-      // Handle exit
-      stream.on('end', async () => {
-        console.log(chalk.yellow('\nContainer stream ended'));
-        
-        // Get container logs to see what happened
-        try {
-          const logs = await container.logs({ stdout: true, stderr: true, tail: 50 });
-          console.log(chalk.yellow('Container logs:'));
-          console.log(logs.toString());
-        } catch (e) {
-          // Ignore
-        }
-        
-        if (process.stdin.isTTY) {
-          process.stdin.setRawMode(false);
-        }
-        process.stdin.pause();
-        process.exit(0);
-      });
-      
-      stream.on('error', (err: Error) => {
-        console.error(chalk.red('Stream error:'), err);
-      });
-      
+
+      console.log(chalk.green('✓ Container setup completed'));
+
     } catch (error) {
-      console.error(chalk.red('Failed to attach to container:'), error);
+      console.error(chalk.red('Setup failed:'), error);
       throw error;
     }
+
+    // Now create an interactive session using exec
+    console.log(chalk.blue('Starting interactive session...'));
+    console.log(chalk.yellow('Type "claude --dangerously-skip-permissions" to start Claude Code'));
+    console.log(chalk.yellow('Press Ctrl+D or type "exit" to end the session'));
+
+    const exec = await container.exec({
+      Cmd: ['/bin/bash', '-l'],
+      AttachStdin: true,
+      AttachStdout: true,
+      AttachStderr: true,
+      Tty: true,
+      WorkingDir: '/workspace',
+    });
+
+    // Start the exec with hijack mode for proper TTY
+    const stream = await exec.start({
+      hijack: true,
+      stdin: true,
+    });
+
+    // Set up TTY properly
+    const originalRawMode = process.stdin.isRaw;
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(true);
+    }
+    process.stdin.resume();
+
+    // Resize handler
+    const resize = async () => {
+      try {
+        await exec.resize({
+          w: process.stdout.columns || 80,
+          h: process.stdout.rows || 24,
+        });
+      } catch (e) {
+        // Ignore resize errors
+      }
+    };
+
+    // Initial resize
+    await resize();
+    process.stdout.on('resize', resize);
+
+    // Connect streams bidirectionally
+    stream.pipe(process.stdout);
+    process.stdin.pipe(stream);
+
+    // Set up proper cleanup
+    const cleanup = () => {
+      console.log(chalk.yellow('\nCleaning up session...'));
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(originalRawMode);
+      }
+      process.stdin.pause();
+      process.stdout.removeListener('resize', resize);
+      if (stream && typeof stream.end === 'function') {
+        stream.end();
+      }
+    };
+
+    // Return a promise that resolves when the session ends
+    return new Promise<void>((resolve, reject) => {
+      let sessionEnded = false;
+
+      const handleEnd = () => {
+        if (!sessionEnded) {
+          sessionEnded = true;
+          console.log(chalk.yellow('\nContainer session ended'));
+          cleanup();
+          resolve();
+        }
+      };
+
+      const handleError = (err: Error) => {
+        if (!sessionEnded) {
+          sessionEnded = true;
+          console.error(chalk.red('Stream error:'), err);
+          cleanup();
+          reject(err);
+        }
+      };
+
+      stream.on('end', handleEnd);
+      stream.on('close', handleEnd);
+      stream.on('error', handleError);
+
+      // Also monitor the exec process
+      const checkExec = async () => {
+        try {
+          const info = await exec.inspect();
+          if (info.ExitCode !== null && !sessionEnded) {
+            handleEnd();
+          }
+        } catch (e) {
+          // Exec might be gone
+          if (!sessionEnded) {
+            handleEnd();
+          }
+        }
+      };
+
+      // Check exec status periodically
+      const statusInterval = setInterval(checkExec, 1000);
+
+      // Clean up interval when session ends
+      stream.on('end', () => clearInterval(statusInterval));
+      stream.on('close', () => clearInterval(statusInterval));
+    });
   }
 
-  private async copyWorkingDirectory(container: Docker.Container, workDir: string): Promise<void> {
+  private async _copyWorkingDirectory(container: Docker.Container, workDir: string): Promise<void> {
     const { execSync } = require('child_process');
     const fs = require('fs');
-    
+
     try {
       // Get list of git-tracked files (including uncommitted changes)
       const trackedFiles = execSync('git ls-files', {
         cwd: workDir,
         encoding: 'utf-8'
       }).trim().split('\n').filter((f: string) => f);
-      
+
       // Get list of untracked files that aren't ignored
       const untrackedFiles = execSync('git ls-files --others --exclude-standard', {
         cwd: workDir,
         encoding: 'utf-8'
       }).trim().split('\n').filter((f: string) => f);
-      
+
       // Combine all files
       const allFiles = [...trackedFiles, ...untrackedFiles];
-      
+
       console.log(chalk.blue(`Copying ${allFiles.length} files...`));
-      
+
       // Create tar archive using git archive for tracked files + untracked files
       const tarFile = `/tmp/claude-sandbox-${Date.now()}.tar`;
-      
+
+      console.log(chalk.gray('Creating archive of tracked files...'));
       // First create archive of tracked files using git archive
       execSync(`git archive --format=tar -o "${tarFile}" HEAD`, {
         cwd: workDir,
         stdio: 'pipe'
       });
-      
+
       // Add untracked files if any
       if (untrackedFiles.length > 0) {
         // Create a file list for tar
         const fileListPath = `/tmp/claude-sandbox-files-${Date.now()}.txt`;
         fs.writeFileSync(fileListPath, untrackedFiles.join('\n'));
-        
+
         // Append untracked files to the tar
         execSync(`tar -rf "${tarFile}" --files-from="${fileListPath}"`, {
           cwd: workDir,
           stdio: 'pipe'
         });
-        
+
         fs.unlinkSync(fileListPath);
       }
-      
+
       // Read and copy the tar file in chunks to avoid memory issues
       const stream = fs.createReadStream(tarFile);
-      
-      // Copy to container
-      await container.putArchive(stream, {
+
+      console.log(chalk.gray('Uploading files to container...'));
+
+      // Add timeout for putArchive
+      const uploadPromise = container.putArchive(stream, {
         path: '/workspace'
       });
-      
-      // Wait for stream to finish
-      await new Promise((resolve, reject) => {
-        stream.on('end', resolve);
-        stream.on('error', reject);
-      });
-      
+
+      // Wait for both upload and stream to complete
+      await Promise.all([
+        uploadPromise,
+        new Promise<void>((resolve, reject) => {
+          stream.on('end', () => {
+            console.log(chalk.gray('Stream ended'));
+            resolve();
+          });
+          stream.on('error', reject);
+        })
+      ]);
+
+      console.log(chalk.gray('Upload completed'));
+
       // Clean up
       fs.unlinkSync(tarFile);
-      
+
       // Also copy .git directory to preserve git history
+      console.log(chalk.gray('Copying git history...'));
       const gitTarFile = `/tmp/claude-sandbox-git-${Date.now()}.tar`;
       execSync(`tar -cf "${gitTarFile}" .git`, {
         cwd: workDir,
         stdio: 'pipe'
       });
-      
-      const gitStream = fs.createReadStream(gitTarFile);
-      await container.putArchive(gitStream, {
-        path: '/workspace'
-      });
-      
-      await new Promise((resolve, reject) => {
-        gitStream.on('end', resolve);
-        gitStream.on('error', reject);
-      });
-      
-      fs.unlinkSync(gitTarFile);
-      
+
+      try {
+        const gitStream = fs.createReadStream(gitTarFile);
+
+        // Upload git archive
+        await container.putArchive(gitStream, {
+          path: '/workspace'
+        });
+
+        console.log(chalk.gray('Git history upload completed'));
+
+        // Clean up
+        fs.unlinkSync(gitTarFile);
+        console.log(chalk.gray('File copy completed'));
+
+      } catch (error) {
+        console.error(chalk.red('Git history copy failed:'), error);
+        // Clean up the tar file even if upload failed
+        try {
+          fs.unlinkSync(gitTarFile);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        throw error;
+      }
+
     } catch (error) {
       console.error(chalk.red('Failed to copy files:'), error);
       throw error;

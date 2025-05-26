@@ -11,14 +11,14 @@ program
   .description('Run Claude Code as an autonomous agent in Docker containers')
   .version('0.1.0')
   .option('-c, --config <path>', 'Path to configuration file', './claude-sandbox.config.json')
-  .option('-d, --detached', 'Run in detached mode', false)
+  .option('-d, --detached', 'Run in detached mode (container runs in background)', false)
   .option('-n, --name <name>', 'Container name prefix')
   .option('--no-push', 'Disable automatic branch pushing')
   .option('--no-pr', 'Disable automatic PR creation')
   .action(async (options) => {
     try {
       console.log(chalk.blue('🚀 Starting Claude Sandbox...'));
-      
+
       const config = await loadConfig(options.config);
       const sandbox = new ClaudeSandbox({
         ...config,
@@ -27,7 +27,7 @@ program
         autoPush: options.push,
         autoCreatePR: options.pr,
       });
-      
+
       await sandbox.run();
     } catch (error) {
       console.error(chalk.red('Error:'), error);
