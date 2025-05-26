@@ -1,0 +1,3 @@
+- [ ] Flag for including vs not including non-tracked files
+- [ ] Fix terminal output
+- [ ] Create listener for Claude turn end, to commit, push and create a PR
