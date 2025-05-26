@@ -348,7 +348,7 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
 
     // First, set up the git branch and create startup script
     try {
-      console.log(chalk.green("Setting up git branch and startup script..."));
+      console.log(chalk.gray("Setting up git branch and startup script..."));
 
       // Create different startup scripts based on autoStartClaude setting
       const startupScript = this.config.autoStartClaude
@@ -410,6 +410,59 @@ exec /bin/bash`;
       });
 
       console.log(chalk.green("✓ Container setup completed"));
+
+      // Execute custom setup commands if provided
+      if (this.config.setupCommands && this.config.setupCommands.length > 0) {
+        console.log(chalk.blue("Running custom setup commands..."));
+
+        for (const command of this.config.setupCommands) {
+          console.log(chalk.gray(`  Running: ${command}`));
+
+          const cmdExec = await container.exec({
+            Cmd: ["/bin/bash", "-c", command],
+            AttachStdout: true,
+            AttachStderr: true,
+            WorkingDir: "/workspace",
+            User: "claude",
+          });
+
+          const cmdStream = await cmdExec.start({});
+
+          // Wait for command to complete
+          await new Promise<void>((resolve, reject) => {
+            let hasError = false;
+
+            cmdStream.on("data", (chunk) => {
+              process.stdout.write(chalk.gray("  > ") + chunk.toString());
+            });
+
+            cmdStream.on("end", async () => {
+              // Check exit code
+              try {
+                const info = await cmdExec.inspect();
+                if (info.ExitCode !== 0) {
+                  console.error(chalk.red(`  ✗ Command failed with exit code ${info.ExitCode}`));
+                  hasError = true;
+                } else {
+                  console.log(chalk.green(`  ✓ Command completed successfully`));
+                }
+              } catch (e) {
+                // Ignore inspection errors
+              }
+
+              if (hasError && this.config.setupCommands?.includes("set -e")) {
+                reject(new Error(`Setup command failed: ${command}`));
+              } else {
+                resolve();
+              }
+            });
+
+            cmdStream.on("error", reject);
+          });
+        }
+
+        console.log(chalk.green("✓ All setup commands completed"));
+      }
     } catch (error) {
       console.error(chalk.red("Setup failed:"), error);
       throw error;

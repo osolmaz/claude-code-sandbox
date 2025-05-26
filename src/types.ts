@@ -7,6 +7,7 @@ export interface SandboxConfig {
   autoCreatePR?: boolean;
   autoStartClaude?: boolean;
   claudeConfigPath?: string;
+  setupCommands?: string[];
   environment?: Record<string, string>;
   volumes?: string[];
   allowedTools?: string[];
