@@ -75,11 +75,37 @@ Create a `claude-sandbox.config.json` file:
   "volumes": [
     "/host/path:/container/path:ro"
   ],
+  "mounts": [
+    {
+      "source": "./data",
+      "target": "/workspace/data",
+      "readonly": false
+    },
+    {
+      "source": "/home/user/configs",
+      "target": "/configs",
+      "readonly": true
+    }
+  ],
   "allowedTools": ["*"],
   "maxThinkingTokens": 100000,
   "bashTimeout": 600000
 }
 ```
+
+#### Mount Configuration
+
+The `mounts` array allows you to mount files or directories into the container:
+
+- `source`: Path on the host (relative paths are resolved from current directory)
+- `target`: Path in the container (relative paths are resolved from /workspace)
+- `readonly`: Optional boolean to make the mount read-only (default: false)
+
+Example use cases:
+- Mount data directories that shouldn't be in git
+- Share configuration files between host and container
+- Mount build artifacts or dependencies
+- Access host system resources (use with caution)
 
 ## Features
 

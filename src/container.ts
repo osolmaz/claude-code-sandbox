@@ -392,9 +392,60 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
 
     // NO SSH mounting - we'll use GitHub tokens instead
 
-    // Add custom volumes
+    // Add custom volumes (legacy format)
     if (this.config.volumes) {
       volumes.push(...this.config.volumes);
+    }
+
+    // Add mount configurations (new format)
+    if (this.config.mounts) {
+      const path = require("path");
+      const fs = require("fs");
+      const os = require("os");
+
+      for (const mount of this.config.mounts) {
+        try {
+          // Expand environment variables in source path
+          let expandedSource = mount.source.replace(/\$HOME/g, os.homedir());
+          expandedSource = expandedSource.replace(/\$(\w+)/g, (match, varName) => {
+            return process.env[varName] || match;
+          });
+
+          // Resolve the source path
+          const sourcePath = path.isAbsolute(expandedSource)
+            ? expandedSource
+            : path.resolve(process.cwd(), expandedSource);
+
+          // Check if source exists
+          if (!fs.existsSync(sourcePath)) {
+            console.log(chalk.yellow(`Warning: Mount source does not exist: ${mount.source} (resolved to ${sourcePath})`));
+            continue;
+          }
+
+          // Expand environment variables in target path
+          let expandedTarget = mount.target.replace(/\$HOME/g, "/home/claude");
+          expandedTarget = expandedTarget.replace(/\$(\w+)/g, (match, varName) => {
+            // For container paths, we need to use container's environment
+            if (varName === "HOME") return "/home/claude";
+            return match; // Keep other variables as-is
+          });
+
+          // Ensure target path is absolute
+          const targetPath = path.isAbsolute(expandedTarget)
+            ? expandedTarget
+            : path.join("/workspace", expandedTarget);
+
+          // Create mount string
+          const mountString = mount.readonly
+            ? `${sourcePath}:${targetPath}:ro`
+            : `${sourcePath}:${targetPath}`;
+
+          volumes.push(mountString);
+          console.log(chalk.blue(`✓ Mounting ${mount.source} → ${targetPath}${mount.readonly ? ' (read-only)' : ''}`));
+        } catch (error) {
+          console.error(chalk.yellow(`Warning: Failed to process mount ${mount.source}:`), error);
+        }
+      }
     }
 
     return volumes;

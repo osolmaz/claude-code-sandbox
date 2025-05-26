@@ -1,3 +1,9 @@
+export interface VolumeMount {
+  source: string;
+  target: string;
+  readonly?: boolean;
+}
+
 export interface SandboxConfig {
   dockerImage?: string;
   dockerfile?: string;
@@ -11,6 +17,7 @@ export interface SandboxConfig {
   environment?: Record<string, string>;
   envFile?: string;
   volumes?: string[];
+  mounts?: VolumeMount[];
   allowedTools?: string[];
   maxThinkingTokens?: number;
   bashTimeout?: number;

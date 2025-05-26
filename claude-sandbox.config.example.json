@@ -9,6 +9,18 @@
     "NODE_ENV": "development"
   },
   "volumes": [],
+  "mounts": [
+    {
+      "source": "./data",
+      "target": "/workspace/data",
+      "readonly": false
+    },
+    {
+      "source": "/home/user/shared-configs",
+      "target": "/configs",
+      "readonly": true
+    }
+  ],
   "allowedTools": ["*"],
   "maxThinkingTokens": 100000,
   "bashTimeout": 600000
