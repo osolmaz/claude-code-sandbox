@@ -15,6 +15,7 @@ program
   .option('-n, --name <name>', 'Container name prefix')
   .option('--no-push', 'Disable automatic branch pushing')
   .option('--no-pr', 'Disable automatic PR creation')
+  .option('--no-auto-claude', 'Disable automatic Claude Code startup', false)
   .action(async (options) => {
     try {
       console.log(chalk.blue('🚀 Starting Claude Sandbox...'));
@@ -26,6 +27,7 @@ program
         containerPrefix: options.name,
         autoPush: options.push,
         autoCreatePR: options.pr,
+        autoStartClaude: !options.noAutoClaude,
       });
 
       await sandbox.run();

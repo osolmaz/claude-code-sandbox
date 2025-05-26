@@ -41,7 +41,7 @@ export class ContainerManager {
 
     // Give the container a moment to initialize
     await new Promise(resolve => setTimeout(resolve, 500));
-    console.log(chalk.gray('Container initialization complete, returning container ID...'));
+    console.log(chalk.green('Container initialization complete, returning container ID...'));
 
     return container.id;
   }
@@ -310,11 +310,36 @@ ENTRYPOINT ["/bin/bash", "-c"]
     // Use provided branch name or generate one
     const targetBranch = branchName || `claude/${new Date().toISOString().replace(/[:.]/g, '-').split('T')[0]}-${Date.now()}`;
 
-    // First, set up the git branch
+    // First, set up the git branch and create startup script
     try {
-      console.log(chalk.gray('Setting up git branch...'));
+      console.log(chalk.green('Setting up git branch and startup script...'));
+
+      // Create different startup scripts based on autoStartClaude setting
+      const startupScript = this.config.autoStartClaude ? `#!/bin/bash
+echo "🚀 Starting Claude Code automatically..."
+echo "Press Ctrl+C to interrupt and access shell"
+echo ""
+claude --dangerously-skip-permissions
+echo ""
+echo "Claude exited. You now have access to the shell."
+echo "Type \\"claude --dangerously-skip-permissions\\" to restart Claude"
+echo "Type \\"exit\\" to end the session"
+exec /bin/bash` : `#!/bin/bash
+echo "Welcome to Claude Code Sandbox!"
+echo "Type \\"claude --dangerously-skip-permissions\\" to start Claude Code"
+echo "Type \\"exit\\" to end the session"
+exec /bin/bash`;
+
       const setupExec = await container.exec({
-        Cmd: ['/bin/bash', '-c', `cd /workspace && git config --global --add safe.directory /workspace && git checkout -b "${targetBranch}" && echo "✓ Created branch: ${targetBranch}"`],
+        Cmd: ['/bin/bash', '-c', `
+          cd /workspace &&
+          git config --global --add safe.directory /workspace &&
+          git checkout -b "${targetBranch}" &&
+          echo "✓ Created branch: ${targetBranch}" &&
+          echo '${startupScript}' > /start-session.sh &&
+          chmod +x /start-session.sh &&
+          echo "✓ Startup script created"
+        `],
         AttachStdout: true,
         AttachStderr: true,
       });
@@ -329,10 +354,10 @@ ENTRYPOINT ["/bin/bash", "-c"]
           process.stdout.write(chunk);
         });
         setupStream.on('end', () => {
-          if (output.includes('✓ Created branch')) {
+          if (output.includes('✓ Created branch') && output.includes('✓ Startup script created')) {
             resolve();
           } else {
-            reject(new Error('Branch creation failed'));
+            reject(new Error('Setup failed'));
           }
         });
         setupStream.on('error', reject);
@@ -345,13 +370,18 @@ ENTRYPOINT ["/bin/bash", "-c"]
       throw error;
     }
 
-    // Now create an interactive session using exec
+    // Now create an interactive session that runs our startup script
     console.log(chalk.blue('Starting interactive session...'));
-    console.log(chalk.yellow('Type "claude --dangerously-skip-permissions" to start Claude Code'));
+    if (this.config.autoStartClaude) {
+      console.log(chalk.yellow('Claude Code will start automatically'));
+      console.log(chalk.yellow('Press Ctrl+C to interrupt Claude and access the shell'));
+    } else {
+      console.log(chalk.yellow('Type "claude --dangerously-skip-permissions" to start Claude Code'));
+    }
     console.log(chalk.yellow('Press Ctrl+D or type "exit" to end the session'));
 
     const exec = await container.exec({
-      Cmd: ['/bin/bash', '-l'],
+      Cmd: ['/start-session.sh'],
       AttachStdin: true,
       AttachStdout: true,
       AttachStderr: true,
@@ -480,7 +510,7 @@ ENTRYPOINT ["/bin/bash", "-c"]
       // Create tar archive using git archive for tracked files + untracked files
       const tarFile = `/tmp/claude-sandbox-${Date.now()}.tar`;
 
-      console.log(chalk.gray('Creating archive of tracked files...'));
+      console.log(chalk.green('Creating archive of tracked files...'));
       // First create archive of tracked files using git archive
       execSync(`git archive --format=tar -o "${tarFile}" HEAD`, {
         cwd: workDir,
@@ -505,7 +535,7 @@ ENTRYPOINT ["/bin/bash", "-c"]
       // Read and copy the tar file in chunks to avoid memory issues
       const stream = fs.createReadStream(tarFile);
 
-      console.log(chalk.gray('Uploading files to container...'));
+      console.log(chalk.green('Uploading files to container...'));
 
       // Add timeout for putArchive
       const uploadPromise = container.putArchive(stream, {
@@ -517,20 +547,20 @@ ENTRYPOINT ["/bin/bash", "-c"]
         uploadPromise,
         new Promise<void>((resolve, reject) => {
           stream.on('end', () => {
-            console.log(chalk.gray('Stream ended'));
+            console.log(chalk.green('Stream ended'));
             resolve();
           });
           stream.on('error', reject);
         })
       ]);
 
-      console.log(chalk.gray('Upload completed'));
+      console.log(chalk.green('Upload completed'));
 
       // Clean up
       fs.unlinkSync(tarFile);
 
       // Also copy .git directory to preserve git history
-      console.log(chalk.gray('Copying git history...'));
+      console.log(chalk.green('Copying git history...'));
       const gitTarFile = `/tmp/claude-sandbox-git-${Date.now()}.tar`;
       execSync(`tar -cf "${gitTarFile}" .git`, {
         cwd: workDir,
@@ -545,11 +575,11 @@ ENTRYPOINT ["/bin/bash", "-c"]
           path: '/workspace'
         });
 
-        console.log(chalk.gray('Git history upload completed'));
+        console.log(chalk.green('Git history upload completed'));
 
         // Clean up
         fs.unlinkSync(gitTarFile);
-        console.log(chalk.gray('File copy completed'));
+        console.log(chalk.green('File copy completed'));
 
       } catch (error) {
         console.error(chalk.red('Git history copy failed:'), error);

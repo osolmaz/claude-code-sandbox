@@ -5,6 +5,7 @@ export interface SandboxConfig {
   containerPrefix?: string;
   autoPush?: boolean;
   autoCreatePR?: boolean;
+  autoStartClaude?: boolean;
   environment?: Record<string, string>;
   volumes?: string[];
   allowedTools?: string[];
