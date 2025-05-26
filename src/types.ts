@@ -9,6 +9,7 @@ export interface SandboxConfig {
   claudeConfigPath?: string;
   setupCommands?: string[];
   environment?: Record<string, string>;
+  envFile?: string;
   volumes?: string[];
   allowedTools?: string[];
   maxThinkingTokens?: number;

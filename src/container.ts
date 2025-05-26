@@ -266,6 +266,57 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
   private prepareEnvironment(credentials: Credentials): string[] {
     const env = [];
 
+    // Load environment variables from .env file if specified
+    if (this.config.envFile) {
+      const fs = require("fs");
+      const path = require("path");
+
+      try {
+        const envFilePath = path.resolve(this.config.envFile);
+        if (fs.existsSync(envFilePath)) {
+          console.log(chalk.blue(`Loading environment from ${this.config.envFile}...`));
+
+          const envContent = fs.readFileSync(envFilePath, "utf-8");
+          const lines = envContent.split("\n");
+
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+
+            // Skip empty lines and comments
+            if (!trimmedLine || trimmedLine.startsWith("#")) {
+              continue;
+            }
+
+            // Skip lines without = sign
+            if (!trimmedLine.includes("=")) {
+              continue;
+            }
+
+            // Parse key=value, handling values with = signs
+            const firstEqualIndex = trimmedLine.indexOf("=");
+            const key = trimmedLine.substring(0, firstEqualIndex).trim();
+            let value = trimmedLine.substring(firstEqualIndex + 1).trim();
+
+            // Remove surrounding quotes if present
+            if ((value.startsWith('"') && value.endsWith('"')) ||
+                (value.startsWith("'") && value.endsWith("'"))) {
+              value = value.slice(1, -1);
+            }
+
+            if (key) {
+              env.push(`${key}=${value}`);
+            }
+          }
+
+          console.log(chalk.green(`✓ Loaded ${env.length} environment variables from ${this.config.envFile}`));
+        } else {
+          console.log(chalk.yellow(`Warning: Environment file ${this.config.envFile} not found`));
+        }
+      } catch (error) {
+        console.error(chalk.yellow(`Warning: Failed to load environment file ${this.config.envFile}:`), error);
+      }
+    }
+
     // Claude credentials from discovery
     if (credentials.claude) {
       switch (credentials.claude.type) {
@@ -335,7 +386,7 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
     return env;
   }
 
-  private prepareVolumes(_workDir: string, credentials: Credentials): string[] {
+  private prepareVolumes(_workDir: string, _credentials: Credentials): string[] {
     // NO MOUNTING workspace - we'll copy files instead
     const volumes: string[] = [];
 
@@ -440,9 +491,12 @@ exec /bin/bash`;
       // Execute custom setup commands if provided
       if (this.config.setupCommands && this.config.setupCommands.length > 0) {
         console.log(chalk.blue("Running custom setup commands..."));
+        console.log(chalk.gray(`Total commands to run: ${this.config.setupCommands.length}`));
 
-        for (const command of this.config.setupCommands) {
-          console.log(chalk.gray(`  Running: ${command}`));
+        for (let i = 0; i < this.config.setupCommands.length; i++) {
+          const command = this.config.setupCommands[i];
+          console.log(chalk.yellow(`\n[${i + 1}/${this.config.setupCommands.length}] Running command:`));
+          console.log(chalk.white(`  ${command}`));
 
           const cmdExec = await container.exec({
             Cmd: ["/bin/bash", "-c", command],
@@ -487,7 +541,7 @@ exec /bin/bash`;
           });
         }
 
-        console.log(chalk.green("✓ All setup commands completed"));
+        console.log(chalk.green("\n✓ All setup commands completed"));
       }
     } catch (error) {
       console.error(chalk.red("Setup failed:"), error);
@@ -959,8 +1013,6 @@ exec /bin/bash`;
       // Don't throw - this is not critical for container operation
     }
   }
-
-
 
   async cleanup(): Promise<void> {
     for (const [, container] of this.containers) {

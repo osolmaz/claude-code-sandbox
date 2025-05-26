@@ -4,6 +4,7 @@
   "detached": false,
   "autoPush": true,
   "autoCreatePR": true,
+  "envFile": ".env",
   "environment": {
     "NODE_ENV": "development"
   },
