@@ -4,10 +4,15 @@
   "detached": false,
   "autoPush": true,
   "autoCreatePR": true,
+  "autoStartClaude": true,
   "envFile": ".env",
   "environment": {
     "NODE_ENV": "development"
   },
+  "setupCommands": [
+    "npm install",
+    "npm run build"
+  ],
   "volumes": [],
   "mounts": [
     {
@@ -23,5 +28,7 @@
   ],
   "allowedTools": ["*"],
   "maxThinkingTokens": 100000,
-  "bashTimeout": 600000
+  "bashTimeout": 600000,
+  "containerPrefix": "claude-code-sandbox",
+  "claudeConfigPath": "~/.claude.json"
 }

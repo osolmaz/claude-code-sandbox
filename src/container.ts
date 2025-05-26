@@ -23,13 +23,13 @@ export class ContainerManager {
 
     // Start container
     await container.start();
-    console.log(chalk.green("✓ Container started successfully"));
+    console.log(chalk.green("✓ Container started"));
 
     // Copy working directory into container
-    console.log(chalk.blue("Copying files into container..."));
+    console.log(chalk.blue("• Copying files into container..."));
     try {
       await this._copyWorkingDirectory(container, containerConfig.workDir);
-      console.log(chalk.green("✓ Files copied successfully"));
+      console.log(chalk.green("✓ Files copied"));
 
       // Copy Claude configuration if it exists
       await this._copyClaudeConfig(container);
@@ -37,7 +37,7 @@ export class ContainerManager {
       // Copy git configuration if it exists
       await this._copyGitConfig(container);
     } catch (error) {
-      console.error(chalk.red("File copy failed:"), error);
+      console.error(chalk.red("✗ File copy failed:"), error);
       // Clean up container on failure
       await container.stop().catch(() => {});
       await container.remove().catch(() => {});
@@ -47,11 +47,7 @@ export class ContainerManager {
 
     // Give the container a moment to initialize
     await new Promise((resolve) => setTimeout(resolve, 500));
-    console.log(
-      chalk.green(
-        "Container initialization complete, returning container ID..."
-      )
-    );
+    console.log(chalk.green("✓ Container ready"));
 
     return container.id;
   }
@@ -65,7 +61,7 @@ export class ContainerManager {
       console.log(chalk.green(`✓ Using existing image: ${imageName}`));
       return;
     } catch (error) {
-      console.log(chalk.blue(`Building image: ${imageName}...`));
+      console.log(chalk.blue(`• Building image: ${imageName}...`));
     }
 
     // Check if we need to build from Dockerfile
@@ -274,7 +270,7 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
       try {
         const envFilePath = path.resolve(this.config.envFile);
         if (fs.existsSync(envFilePath)) {
-          console.log(chalk.blue(`Loading environment from ${this.config.envFile}...`));
+          console.log(chalk.blue(`• Loading environment from ${this.config.envFile}...`));
 
           const envContent = fs.readFileSync(envFilePath, "utf-8");
           const lines = envContent.split("\n");
@@ -310,10 +306,10 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
 
           console.log(chalk.green(`✓ Loaded ${env.length} environment variables from ${this.config.envFile}`));
         } else {
-          console.log(chalk.yellow(`Warning: Environment file ${this.config.envFile} not found`));
+          console.log(chalk.yellow(`⚠ Environment file ${this.config.envFile} not found`));
         }
       } catch (error) {
-        console.error(chalk.yellow(`Warning: Failed to load environment file ${this.config.envFile}:`), error);
+        console.error(chalk.yellow(`⚠ Failed to load environment file ${this.config.envFile}:`), error);
       }
     }
 
@@ -418,7 +414,7 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
 
           // Check if source exists
           if (!fs.existsSync(sourcePath)) {
-            console.log(chalk.yellow(`Warning: Mount source does not exist: ${mount.source} (resolved to ${sourcePath})`));
+            console.log(chalk.yellow(`⚠ Mount source does not exist: ${mount.source} (resolved to ${sourcePath})`));
             continue;
           }
 
@@ -443,7 +439,7 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
           volumes.push(mountString);
           console.log(chalk.blue(`✓ Mounting ${mount.source} → ${targetPath}${mount.readonly ? ' (read-only)' : ''}`));
         } catch (error) {
-          console.error(chalk.yellow(`Warning: Failed to process mount ${mount.source}:`), error);
+          console.error(chalk.yellow(`⚠ Failed to process mount ${mount.source}:`), error);
         }
       }
     }
@@ -457,7 +453,7 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
       throw new Error("Container not found");
     }
 
-    console.log(chalk.blue("Connecting to container..."));
+    console.log(chalk.blue("• Connecting to container..."));
 
     // Use provided branch name or generate one
     const targetBranch =
@@ -468,7 +464,7 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
 
     // First, set up the git branch and create startup script
     try {
-      console.log(chalk.gray("Setting up git branch and startup script..."));
+      console.log(chalk.blue("• Setting up git branch and startup script..."));
 
       // Create different startup scripts based on autoStartClaude setting
       const startupScript = this.config.autoStartClaude
@@ -541,8 +537,8 @@ exec /bin/bash`;
 
       // Execute custom setup commands if provided
       if (this.config.setupCommands && this.config.setupCommands.length > 0) {
-        console.log(chalk.blue("Running custom setup commands..."));
-        console.log(chalk.gray(`Total commands to run: ${this.config.setupCommands.length}`));
+        console.log(chalk.blue("• Running custom setup commands..."));
+        console.log(chalk.blue(`  Total commands to run: ${this.config.setupCommands.length}`));
 
         for (let i = 0; i < this.config.setupCommands.length; i++) {
           const command = this.config.setupCommands[i];
@@ -564,7 +560,7 @@ exec /bin/bash`;
             let hasError = false;
 
             cmdStream.on("data", (chunk) => {
-              process.stdout.write(chalk.gray("  > ") + chunk.toString());
+              process.stdout.write("  > " + chunk.toString());
             });
 
             cmdStream.on("end", async () => {
@@ -572,10 +568,10 @@ exec /bin/bash`;
               try {
                 const info = await cmdExec.inspect();
                 if (info.ExitCode !== 0) {
-                  console.error(chalk.red(`  ✗ Command failed with exit code ${info.ExitCode}`));
+                  console.error(chalk.red(`✗ Command failed with exit code ${info.ExitCode}`));
                   hasError = true;
                 } else {
-                  console.log(chalk.green(`  ✓ Command completed successfully`));
+                  console.log(chalk.green(`✓ Command completed successfully`));
                 }
               } catch (e) {
                 // Ignore inspection errors
@@ -592,28 +588,28 @@ exec /bin/bash`;
           });
         }
 
-        console.log(chalk.green("\n✓ All setup commands completed"));
+        console.log(chalk.green("✓ All setup commands completed"));
       }
     } catch (error) {
-      console.error(chalk.red("Setup failed:"), error);
+      console.error(chalk.red("✗ Setup failed:"), error);
       throw error;
     }
 
     // Now create an interactive session that runs our startup script
-    console.log(chalk.blue("Starting interactive session..."));
+    console.log(chalk.blue("• Starting interactive session..."));
     if (this.config.autoStartClaude) {
-      console.log(chalk.yellow("Claude Code will start automatically"));
+      console.log(chalk.yellow("• Claude Code will start automatically"));
       console.log(
-        chalk.yellow("Press Ctrl+C to interrupt Claude and access the shell")
+        chalk.yellow("• Press Ctrl+C to interrupt Claude and access the shell")
       );
     } else {
       console.log(
         chalk.yellow(
-          'Type "claude --dangerously-skip-permissions" to start Claude Code'
+          '• Type "claude --dangerously-skip-permissions" to start Claude Code'
         )
       );
     }
-    console.log(chalk.yellow('Press Ctrl+D or type "exit" to end the session'));
+    console.log(chalk.yellow('• Press Ctrl+D or type "exit" to end the session'));
 
     const exec = await container.exec({
       Cmd: ["/home/claude/start-session.sh"],
@@ -752,12 +748,11 @@ exec /bin/bash`;
       // Combine all files
       const allFiles = [...trackedFiles, ...untrackedFiles];
 
-      console.log(chalk.blue(`Copying ${allFiles.length} files...`));
+      console.log(chalk.blue(`• Copying ${allFiles.length} files...`));
 
       // Create tar archive using git archive for tracked files + untracked files
       const tarFile = `/tmp/claude-sandbox-${Date.now()}.tar`;
 
-      console.log(chalk.green("Creating archive of tracked files..."));
       // First create archive of tracked files using git archive
       execSync(`git archive --format=tar -o "${tarFile}" HEAD`, {
         cwd: workDir,
@@ -782,8 +777,6 @@ exec /bin/bash`;
       // Read and copy the tar file in chunks to avoid memory issues
       const stream = fs.createReadStream(tarFile);
 
-      console.log(chalk.green("Uploading files to container..."));
-
       // Add timeout for putArchive
       const uploadPromise = container.putArchive(stream, {
         path: "/workspace",
@@ -794,20 +787,17 @@ exec /bin/bash`;
         uploadPromise,
         new Promise<void>((resolve, reject) => {
           stream.on("end", () => {
-            console.log(chalk.green("Stream ended"));
             resolve();
           });
           stream.on("error", reject);
         }),
       ]);
 
-      console.log(chalk.green("Upload completed"));
-
       // Clean up
       fs.unlinkSync(tarFile);
 
       // Also copy .git directory to preserve git history
-      console.log(chalk.green("Copying git history..."));
+      console.log(chalk.blue("• Copying git history..."));
       const gitTarFile = `/tmp/claude-sandbox-git-${Date.now()}.tar`;
       // Exclude macOS resource fork files when creating git archive
       execSync(`tar -cf "${gitTarFile}" --exclude="._*" .git`, {
@@ -823,13 +813,10 @@ exec /bin/bash`;
           path: "/workspace",
         });
 
-        console.log(chalk.green("Git history upload completed"));
-
         // Clean up
         fs.unlinkSync(gitTarFile);
-        console.log(chalk.green("File copy completed"));
       } catch (error) {
-        console.error(chalk.red("Git history copy failed:"), error);
+        console.error(chalk.red("✗ Git history copy failed:"), error);
         // Clean up the tar file even if upload failed
         try {
           fs.unlinkSync(gitTarFile);
@@ -839,7 +826,7 @@ exec /bin/bash`;
         throw error;
       }
     } catch (error) {
-      console.error(chalk.red("Failed to copy files:"), error);
+      console.error(chalk.red("✗ Failed to copy files:"), error);
       throw error;
     }
   }
@@ -854,7 +841,7 @@ exec /bin/bash`;
       // First, try to get credentials from macOS Keychain if on Mac
       if (process.platform === "darwin") {
         try {
-          console.log(chalk.blue("Checking macOS Keychain for Claude credentials..."));
+          console.log(chalk.blue("• Checking macOS Keychain for Claude credentials..."));
           const keychainCreds = execSync('security find-generic-password -s "Claude Code-credentials" -w', {
             encoding: "utf-8",
             stdio: ["pipe", "pipe", "pipe"], // Suppress stderr
@@ -911,14 +898,14 @@ exec /bin/bash`;
           }
         } catch (error) {
           // Keychain access failed or credentials not found - not critical
-          console.log(chalk.yellow("No Claude credentials found in macOS Keychain"));
+          console.log(chalk.yellow("• No Claude credentials found in macOS Keychain"));
         }
       }
 
       // Copy .claude.json if it exists
       const claudeJsonPath = path.join(os.homedir(), ".claude.json");
       if (fs.existsSync(claudeJsonPath)) {
-        console.log(chalk.blue("Copying .claude.json..."));
+        console.log(chalk.blue("• Copying .claude.json..."));
 
         const configContent = fs.readFileSync(claudeJsonPath, "utf-8");
         const tarFile = `/tmp/claude-json-${Date.now()}.tar`;
@@ -959,7 +946,7 @@ exec /bin/bash`;
       // Copy .claude directory if it exists (but skip if we already copied from Keychain)
       const claudeDir = path.join(os.homedir(), ".claude");
       if (fs.existsSync(claudeDir) && fs.statSync(claudeDir).isDirectory() && process.platform !== "darwin") {
-        console.log(chalk.blue("Copying .claude directory..."));
+        console.log(chalk.blue("• Copying .claude directory..."));
 
         const tarFile = `/tmp/claude-dir-${Date.now()}.tar`;
         execSync(`tar -cf "${tarFile}" -C "${os.homedir()}" .claude`, {
@@ -983,7 +970,7 @@ exec /bin/bash`;
 
       console.log(chalk.green("✓ Claude configuration copied successfully"));
     } catch (error) {
-      console.error(chalk.yellow("Warning: Failed to copy Claude configuration:"), error);
+      console.error(chalk.yellow("⚠ Failed to copy Claude configuration:"), error);
       // Don't throw - this is not critical for container operation
     }
   }
@@ -1001,7 +988,7 @@ exec /bin/bash`;
         return; // No git config to copy
       }
 
-      console.log(chalk.blue("Copying git configuration..."));
+      console.log(chalk.blue("• Copying git configuration..."));
 
       // Read the git config file
       const configContent = fs.readFileSync(gitConfigPath, "utf-8");
@@ -1058,7 +1045,7 @@ exec /bin/bash`;
       console.log(chalk.green("✓ Git configuration copied successfully"));
     } catch (error) {
       console.error(
-        chalk.yellow("Warning: Failed to copy git configuration:"),
+        chalk.yellow("⚠ Failed to copy git configuration:"),
         error
       );
       // Don't throw - this is not critical for container operation

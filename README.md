@@ -1,31 +1,36 @@
-# Claude Sandbox
+# Claude Code Sandbox
 
 Run Claude Code as an autonomous agent inside Docker containers with automatic git integration.
 
 ## Overview
 
-Claude Sandbox allows you to run Claude Code in isolated Docker containers, providing a safe environment for AI-assisted development. It automatically:
+Claude Code Sandbox allows you to run Claude Code in isolated Docker containers, providing a safe environment for AI-assisted development. It automatically:
 
 - Creates a new git branch for each session
 - Monitors for commits made by Claude
 - Provides interactive review of changes
 - Handles credential forwarding securely
 - Enables push/PR creation workflows
+- Runs custom setup commands for environment initialization
 
 ## Installation
 
-```bash
-npm install -g claude-sandbox
-```
-
-Or clone and build locally:
+Claude Code Sandbox must be built from source:
 
 ```bash
-git clone <repo>
+git clone https://github.com/your-repo/claude-code-sandbox.git
+cd claude-code-sandbox
 npm install
 npm run build
-npm link
+npm link  # Creates global 'claude-sandbox' command
 ```
+
+### Prerequisites
+
+- Node.js >= 18.0.0
+- Docker
+- Git
+- Claude Code (`npm install -g @anthropic-ai/claude-code@latest`)
 
 ## Usage
 
@@ -60,7 +65,7 @@ Options:
 
 ### Configuration
 
-Create a `claude-sandbox.config.json` file:
+Create a `claude-sandbox.config.json` file (see `claude-sandbox.config.example.json` for reference):
 
 ```json
 {
@@ -69,9 +74,15 @@ Create a `claude-sandbox.config.json` file:
   "detached": false,
   "autoPush": true,
   "autoCreatePR": true,
+  "autoStartClaude": true,
+  "envFile": ".env",
   "environment": {
     "NODE_ENV": "development"
   },
+  "setupCommands": [
+    "npm install",
+    "npm run build"
+  ],
   "volumes": [
     "/host/path:/container/path:ro"
   ],
@@ -89,9 +100,30 @@ Create a `claude-sandbox.config.json` file:
   ],
   "allowedTools": ["*"],
   "maxThinkingTokens": 100000,
-  "bashTimeout": 600000
+  "bashTimeout": 600000,
+  "containerPrefix": "my-project",
+  "claudeConfigPath": "~/.claude.json"
 }
 ```
+
+#### Configuration Options
+
+- `dockerImage`: Base Docker image to use (default: `claude-code-sandbox:latest`)
+- `dockerfile`: Path to custom Dockerfile (optional)
+- `detached`: Run container in detached mode
+- `autoPush`: Automatically push branches after commits
+- `autoCreatePR`: Automatically create pull requests
+- `autoStartClaude`: Start Claude Code automatically (default: true)
+- `envFile`: Load environment variables from file (e.g., `.env`)
+- `environment`: Additional environment variables
+- `setupCommands`: Commands to run after container starts (e.g., install dependencies)
+- `volumes`: Legacy volume mounts (string format)
+- `mounts`: Modern mount configuration (object format)
+- `allowedTools`: Claude tool permissions (default: all)
+- `maxThinkingTokens`: Maximum thinking tokens for Claude
+- `bashTimeout`: Timeout for bash commands in milliseconds
+- `containerPrefix`: Custom prefix for container names
+- `claudeConfigPath`: Path to Claude configuration file
 
 #### Mount Configuration
 
@@ -111,25 +143,27 @@ Example use cases:
 
 ### Automatic Credential Discovery
 
-Claude Sandbox automatically discovers and forwards:
+Claude Code Sandbox automatically discovers and forwards:
 
 **Claude Credentials:**
 - Anthropic API keys (`ANTHROPIC_API_KEY`)
-- Claude Max OAuth tokens
+- macOS Keychain credentials (Claude Code)
 - AWS Bedrock credentials
 - Google Vertex credentials
+- Claude configuration files (`.claude.json`, `.claude/`)
 
 **GitHub Credentials:**
-- GitHub CLI authentication
-- SSH keys
-- Git configuration
+- GitHub CLI authentication (`gh auth`)
+- GitHub tokens (`GITHUB_TOKEN`, `GH_TOKEN`)
+- Git configuration (`.gitconfig`)
 
 ### Sandboxed Execution
 
 - Claude runs with `--dangerously-skip-permissions` flag (safe in container)
-- Git wrapper prevents branch switching
+- Creates isolated branch for each session
 - Full access to run any command within the container
-- Network isolation and security
+- Files are copied into container (not mounted) for true isolation
+- Git history preserved for proper version control
 
 ### Commit Monitoring
 
@@ -232,13 +266,20 @@ Reference in config:
 ### Claude Code not found
 Ensure Claude Code is installed globally:
 ```bash
-npm install -g claude-code@latest
+npm install -g @anthropic-ai/claude-code@latest
 ```
 
 ### Docker permission issues
 Add your user to the docker group:
 ```bash
 sudo usermod -aG docker $USER
+# Log out and back in for changes to take effect
+```
+
+### Container cleanup
+Remove all Claude Sandbox containers and images:
+```bash
+npm run purge-containers
 ```
 
 ### Credential discovery fails
@@ -248,13 +289,33 @@ export ANTHROPIC_API_KEY=your-key
 export GITHUB_TOKEN=your-token
 ```
 
+Or use an `.env` file with `envFile` config option.
+
+### Build errors
+Ensure you're using Node.js >= 18.0.0:
+```bash
+node --version
+```
+
+## Development
+
+### Available Scripts
+
+- `npm run build` - Build TypeScript to JavaScript
+- `npm run dev` - Watch mode for development
+- `npm start` - Run the CLI
+- `npm run lint` - Run ESLint
+- `npm test` - Run tests
+- `npm run purge-containers` - Clean up all containers
+
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Run tests: `npm test`
-5. Submit a pull request
+5. Run linter: `npm run lint`
+6. Submit a pull request
 
 ## License
 
