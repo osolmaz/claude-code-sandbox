@@ -2,6 +2,18 @@
 
 Run Claude Code as an autonomous agent inside Docker containers with automatic git integration.
 
+## Why Claude Code Sandbox?
+
+The primary goal of Claude Code Sandbox is to enable **full async agentic workflows** by allowing Claude Code to execute without permission prompts. By running Claude in an isolated Docker container with the `--dangerously-skip-permissions` flag, Claude can:
+
+- Execute any command instantly without asking for permission
+- Make code changes autonomously
+- Run build tools, tests, and development servers
+- Create commits and manage git operations
+- Work continuously without interrupting the user
+
+This creates a truly autonomous development assistant that can work asynchronously while you focus on other tasks, similar to [OpenAI Codex](https://chatgpt.com/codex) or [Google Jules](https://jules.dev), but running locally on your machine.
+
 ## Overview
 
 Claude Code Sandbox allows you to run Claude Code in isolated Docker containers, providing a safe environment for AI-assisted development. It automatically:
