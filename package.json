@@ -11,7 +11,8 @@
     "dev": "tsc --watch",
     "start": "node dist/cli.js",
     "lint": "eslint src/**/*.ts",
-    "test": "jest"
+    "test": "jest",
+    "purge-containers": "docker ps -a --filter \"ancestor=claude-code-sandbox:latest\" -q | xargs -r docker rm -f && docker rmi claude-code-sandbox:latest"
   },
   "keywords": [
     "claude",

@@ -33,6 +33,9 @@ export class ContainerManager {
 
       // Copy Claude configuration if it exists
       await this._copyClaudeConfig(container);
+
+      // Copy git configuration if it exists
+      await this._copyGitConfig(container);
     } catch (error) {
       console.error(chalk.red("File copy failed:"), error);
       // Clean up container on failure
@@ -117,11 +120,6 @@ RUN mkdir -p /workspace && \\
 # Switch to non-root user
 USER claude
 WORKDIR /workspace
-
-# Create a wrapper script for git that prevents branch switching
-RUN sudo mv /usr/bin/git /usr/bin/git.real && \
-    echo -e '#!/bin/bash\\nif [ ! -f /tmp/.branch-created ]; then\\n    /usr/bin/git.real "$@"\\n    if [[ "$1" == "checkout" ]] && [[ "$2" == "-b" ]]; then\\n        touch /tmp/.branch-created\\n    fi\\nelse\\n    if [[ "$1" == "checkout" ]] && [[ "$2" != "-b" ]]; then\\n        echo "Branch switching is disabled in claude-code-sandbox"\\n        exit 1\\n    fi\\n    if [[ "$1" == "switch" ]]; then\\n        echo "Branch switching is disabled in claude-code-sandbox"\\n        exit 1\\n    fi\\n    /usr/bin/git.real "$@"\\nfi' | sudo tee /usr/bin/git > /dev/null && \
-    sudo chmod +x /usr/bin/git
 
 # Set up entrypoint
 ENTRYPOINT ["/bin/bash", "-c"]
@@ -323,11 +321,6 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
     // Mount SSH keys if available
     if (credentials.github?.sshKey) {
       volumes.push(`${process.env.HOME}/.ssh:/home/claude/.ssh:ro`);
-    }
-
-    // Mount git config if available
-    if (credentials.github?.gitConfig) {
-      volumes.push(`${process.env.HOME}/.gitconfig:/home/claude/.gitconfig:ro`);
     }
 
     // Add custom volumes
@@ -745,6 +738,83 @@ exec /bin/bash`;
     } catch (error) {
       console.error(
         chalk.yellow("Warning: Failed to copy Claude configuration:"),
+        error
+      );
+      // Don't throw - this is not critical for container operation
+    }
+  }
+
+  private async _copyGitConfig(container: Docker.Container): Promise<void> {
+    const fs = require("fs");
+    const os = require("os");
+    const path = require("path");
+
+    const gitConfigPath = path.join(os.homedir(), ".gitconfig");
+
+    try {
+      // Check if the git config file exists
+      if (!fs.existsSync(gitConfigPath)) {
+        return; // No git config to copy
+      }
+
+      console.log(chalk.blue("Copying git configuration..."));
+
+      // Read the git config file
+      const configContent = fs.readFileSync(gitConfigPath, "utf-8");
+
+      // Create a temporary tar file with the git config
+      const tarFile = `/tmp/git-config-${Date.now()}.tar`;
+      const tarStream = require("tar-stream");
+      const pack = tarStream.pack();
+
+      // Add the .gitconfig file to the tar
+      pack.entry(
+        { name: ".gitconfig", mode: 0o644 },
+        configContent,
+        (err: any) => {
+          if (err) throw err;
+          pack.finalize();
+        }
+      );
+
+      // Write the tar to a file
+      const chunks: Buffer[] = [];
+      pack.on("data", (chunk: any) => chunks.push(chunk));
+
+      await new Promise<void>((resolve, reject) => {
+        pack.on("end", () => {
+          fs.writeFileSync(tarFile, Buffer.concat(chunks));
+          resolve();
+        });
+        pack.on("error", reject);
+      });
+
+      // Copy the tar file to the container's claude user home directory
+      const stream = fs.createReadStream(tarFile);
+      await container.putArchive(stream, {
+        path: "/home/claude", // Copy to claude user's home directory
+      });
+
+      // Clean up
+      fs.unlinkSync(tarFile);
+
+      // Fix permissions on the copied file
+      const fixPermsExec = await container.exec({
+        Cmd: [
+          "/bin/bash",
+          "-c",
+          "sudo chown claude:claude /home/claude/.gitconfig",
+        ],
+        AttachStdout: false,
+        AttachStderr: false,
+      });
+
+      await fixPermsExec.start({});
+
+      console.log(chalk.green("✓ Git configuration copied successfully"));
+    } catch (error) {
+      console.error(
+        chalk.yellow("Warning: Failed to copy git configuration:"),
         error
       );
       // Don't throw - this is not critical for container operation
