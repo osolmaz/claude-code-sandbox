@@ -21,6 +21,7 @@ export interface SandboxConfig {
   allowedTools?: string[];
   maxThinkingTokens?: number;
   bashTimeout?: number;
+  webUI?: boolean;
 }
 
 export interface Credentials {

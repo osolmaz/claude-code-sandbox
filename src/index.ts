@@ -5,6 +5,7 @@ import { CredentialManager } from "./credentials";
 import { GitMonitor } from "./git-monitor";
 import { ContainerManager } from "./container";
 import { UIManager } from "./ui";
+import { WebUIServer } from "./web-server";
 import { SandboxConfig } from "./types";
 import path from "path";
 
@@ -16,6 +17,7 @@ export class ClaudeSandbox {
   private gitMonitor: GitMonitor;
   private containerManager: ContainerManager;
   private ui: UIManager;
+  private webServer?: WebUIServer;
 
   constructor(config: SandboxConfig) {
     this.config = config;
@@ -67,8 +69,23 @@ export class ClaudeSandbox {
       await this.gitMonitor.start(branchName);
       console.log(chalk.blue("✓ Git monitoring started"));
 
+      // Launch web UI if requested
+      if (this.config.webUI) {
+        this.webServer = new WebUIServer(this.docker);
+        const webUrl = await this.webServer.start();
+        
+        // Open browser to the web UI with container ID
+        const fullUrl = `${webUrl}?container=${containerId}`;
+        await this.webServer.openInBrowser(fullUrl);
+        
+        console.log(chalk.green(`\n✓ Web UI available at: ${fullUrl}`));
+        console.log(chalk.yellow("Keep this terminal open to maintain the session"));
+        
+        // Keep the process running
+        await new Promise(() => {}); // This will keep the process alive
+      }
       // Attach to container or run detached
-      if (!this.config.detached) {
+      else if (!this.config.detached) {
         console.log(chalk.blue("Preparing to attach to container..."));
 
         // Set up cleanup handler
@@ -202,6 +219,9 @@ export class ClaudeSandbox {
   private async cleanup(): Promise<void> {
     await this.gitMonitor.stop();
     await this.containerManager.cleanup();
+    if (this.webServer) {
+      await this.webServer.stop();
+    }
   }
 }
 

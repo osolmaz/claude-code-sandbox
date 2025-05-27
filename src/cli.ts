@@ -28,6 +28,7 @@ program
   .option("--no-push", "Disable automatic branch pushing")
   .option("--no-pr", "Disable automatic PR creation")
   .option("--no-auto-claude", "Disable automatic Claude Code startup", false)
+  .option("-w, --web", "Launch web UI for terminal access")
   .action(async (options) => {
     try {
       console.log(chalk.blue("🚀 Starting Claude Sandbox..."));
@@ -41,6 +42,7 @@ program
         autoPush: options.push,
         autoCreatePR: options.pr,
         autoStartClaude: !options.noAutoClaude,
+        webUI: options.web,
       });
 
       await sandbox.run();

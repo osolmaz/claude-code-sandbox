@@ -72,6 +72,7 @@ Options:
   -n, --name <name>      Container name prefix
   --no-push              Disable automatic branch pushing
   --no-pr                Disable automatic PR creation
+  -w, --web              Launch web UI for terminal access
   -h, --help             Display help
   -V, --version          Display version
 ```
@@ -149,6 +150,26 @@ Example use cases:
 - Access host system resources (use with caution)
 
 ## Features
+
+### Web UI Terminal
+
+Launch a browser-based terminal interface to interact with Claude Code:
+
+```bash
+claude-sandbox --web
+```
+
+This will:
+- Start the container in detached mode
+- Launch a web server on `http://localhost:3456`
+- Open your browser automatically
+- Provide a full terminal interface with:
+  - Real-time terminal streaming
+  - Copy/paste support
+  - Terminal resizing
+  - Reconnection capabilities
+
+Perfect for when you want to monitor Claude's work while doing other tasks.
 
 ### Automatic Credential Discovery
 
