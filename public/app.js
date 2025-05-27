@@ -12,6 +12,7 @@ let lastNotificationTime = 0;
 let idleTimer = null;
 let isWaitingForLoadingAnimation = false;
 let seenLoadingChars = new Set();
+let originalPageTitle = '';
 const IDLE_THRESHOLD = 1500; // 1.5 seconds of no output means waiting for input
 const NOTIFICATION_COOLDOWN = 2000; // 2 seconds between notifications
 
@@ -157,24 +158,17 @@ function onIdleDetected() {
                 }
             }
 
-            // Always show visual notification
-            const originalStatus = document.getElementById('status-text').textContent;
-            updateStatus('connected', '⚠️ Input needed');
-
-            // Flash the page title
-            const originalTitle = document.title;
-            let titleFlashInterval = setInterval(() => {
-                document.title = document.title === originalTitle ? '⚠️ Input needed' : originalTitle;
-            }, 1000);
-
-            // Restore original status and title after a delay
-            setTimeout(() => {
-                if (document.getElementById('status-text').textContent === '⚠️ Input needed') {
-                    updateStatus('connected', originalStatus);
-                }
-                clearInterval(titleFlashInterval);
-                document.title = originalTitle;
-            }, 5000);
+            // Show permanent visual notification
+            document.body.classList.add('input-needed');
+            
+            // Update status bar
+            updateStatus('connected', '⚠️ Waiting for input');
+            
+            // Update page title
+            if (!originalPageTitle) {
+                originalPageTitle = document.title;
+            }
+            document.title = '⚠️ Input needed - ' + originalPageTitle;
         }
     }
 }
@@ -296,6 +290,17 @@ function initTerminal() {
                 seenLoadingChars.clear(); // Clear seen loading chars
                 console.log('[STATE] User provided input, waiting for loading animation...');
                 console.log('[STATE] Need to see these chars:', Array.from(UNIQUE_LOADING_CHARS).join(', '));
+                
+                // Clear the input-needed visual state
+                document.body.classList.remove('input-needed');
+                
+                // Reset title
+                if (originalPageTitle) {
+                    document.title = originalPageTitle;
+                }
+                
+                // Update status
+                updateStatus('connected', `Connected to ${containerId.substring(0, 12)}`);
             }
         }
     });
@@ -396,6 +401,12 @@ function initSocket() {
             clearTimeout(idleTimer);
             idleTimer = null;
         }
+        
+        // Clear input-needed state
+        document.body.classList.remove('input-needed');
+        if (originalPageTitle) {
+            document.title = originalPageTitle;
+        }
     });
 
     socket.on('container-disconnected', () => {
@@ -406,6 +417,12 @@ function initSocket() {
         if (idleTimer) {
             clearTimeout(idleTimer);
             idleTimer = null;
+        }
+        
+        // Clear input-needed state
+        document.body.classList.remove('input-needed');
+        if (originalPageTitle) {
+            document.title = originalPageTitle;
         }
     });
 
@@ -498,6 +515,9 @@ function copySelection() {
 
 // Initialize everything when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+    // Store original page title
+    originalPageTitle = document.title;
+    
     initTerminal();
     initSocket();
 
