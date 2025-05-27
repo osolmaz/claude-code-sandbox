@@ -31,9 +31,15 @@ export class ShadowRepository {
     // Ensure base directory exists
     await fs.ensureDir(this.basePath);
     
-    // Remove any existing shadow repo
+    // Remove any existing shadow repo completely
     if (await fs.pathExists(this.shadowPath)) {
-      await fs.remove(this.shadowPath);
+      try {
+        // Force remove with sudo if needed
+        await execAsync(`rm -rf ${this.shadowPath}`);
+      } catch (error) {
+        // Fallback to fs.remove
+        await fs.remove(this.shadowPath);
+      }
     }
     
     // Clone with minimal data
@@ -44,9 +50,41 @@ export class ShadowRepository {
       });
       const sourceBranch = currentBranch.trim() || 'main';
       
-      // Clone from the current branch, not the target Claude branch
-      const cloneCmd = `git clone --single-branch --branch ${sourceBranch} --depth 1 ${this.options.originalRepo} ${this.shadowPath}`;
-      await execAsync(cloneCmd);
+      // Try different clone approaches for robustness
+      let cloneSuccess = false;
+      
+      // Approach 1: Try standard clone
+      try {
+        const cloneCmd = `git clone --single-branch --branch ${sourceBranch} --depth 1 "${this.options.originalRepo}" "${this.shadowPath}"`;
+        await execAsync(cloneCmd);
+        cloneSuccess = true;
+      } catch (cloneError) {
+        console.log(chalk.yellow('  Standard clone failed, trying alternative...'));
+        
+        // Approach 2: Try without depth limit
+        try {
+          const cloneCmd = `git clone --single-branch --branch ${sourceBranch} "${this.options.originalRepo}" "${this.shadowPath}"`;
+          await execAsync(cloneCmd);
+          cloneSuccess = true;
+        } catch (cloneError2) {
+          console.log(chalk.yellow('  Alternative clone failed, trying copy approach...'));
+          
+          // Approach 3: Copy working tree and init new repo
+          await fs.ensureDir(this.shadowPath);
+          await execAsync(`cp -r "${this.options.originalRepo}/." "${this.shadowPath}/"`);
+          
+          // Remove and reinit git repo
+          await fs.remove(path.join(this.shadowPath, '.git'));
+          await execAsync('git init', { cwd: this.shadowPath });
+          await execAsync('git add .', { cwd: this.shadowPath });
+          await execAsync(`git commit -m "Initial commit from ${sourceBranch}"`, { cwd: this.shadowPath });
+          cloneSuccess = true;
+        }
+      }
+      
+      if (!cloneSuccess) {
+        throw new Error('All clone approaches failed');
+      }
       
       // Create the Claude branch locally if it's different from source
       if (this.options.claudeBranch !== sourceBranch) {
@@ -70,9 +108,48 @@ export class ShadowRepository {
     
     // First, ensure files in container are owned by claude user
     try {
-      await execAsync(`docker exec ${containerId} chown -R claude:claude ${containerPath}`);
+      console.log(chalk.blue('  Fixing file ownership in container...'));
+      
+      // Try multiple approaches to fix ownership
+      let ownershipFixed = false;
+      
+      // Approach 1: Run as root
+      try {
+        await execAsync(`docker exec --user root ${containerId} chown -R claude:claude ${containerPath}`);
+        ownershipFixed = true;
+      } catch (rootError) {
+        // Approach 2: Try without --user root
+        try {
+          await execAsync(`docker exec ${containerId} chown -R claude:claude ${containerPath}`);
+          ownershipFixed = true;
+        } catch (normalError) {
+          // Approach 3: Use sudo if available
+          try {
+            await execAsync(`docker exec ${containerId} sudo chown -R claude:claude ${containerPath}`);
+            ownershipFixed = true;
+          } catch (sudoError) {
+            // Continue without fixing ownership
+          }
+        }
+      }
+      
+      // Verify the change worked
+      if (ownershipFixed) {
+        try {
+          const { stdout: verification } = await execAsync(`docker exec ${containerId} ls -la ${containerPath}/README.md 2>/dev/null || echo "no readme"`);
+          if (verification.includes('claude claude')) {
+            console.log(chalk.green('  ✓ Container file ownership fixed'));
+          } else {
+            console.log(chalk.yellow('  ⚠ Ownership fix verification failed, but continuing...'));
+          }
+        } catch (verifyError) {
+          console.log(chalk.gray('  (Could not verify ownership fix, continuing...)'));
+        }
+      } else {
+        console.log(chalk.gray('  (Could not fix container file ownership, continuing...)'));
+      }
     } catch (error) {
-      console.log(chalk.gray('  (Could not fix container file ownership, continuing...)'));
+      console.log(chalk.gray('  (Ownership fix failed, continuing with sync...)'));
     }
     
     // Check if rsync is available in container
@@ -92,7 +169,15 @@ export class ShadowRepository {
       await execAsync(`docker exec ${containerId} which rsync`);
       return true;
     } catch {
-      return false;
+      // Try to install rsync if not available
+      try {
+        console.log(chalk.yellow('  Installing rsync in container...'));
+        await execAsync(`docker exec ${containerId} apk add --no-cache rsync`);
+        return true;
+      } catch (installError) {
+        console.log(chalk.gray('  (Could not install rsync, using docker cp)'));
+        return false;
+      }
     }
   }
   
