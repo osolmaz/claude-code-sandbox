@@ -5,7 +5,7 @@ let fitAddon;
 let webLinksAddon;
 let containerId;
 
-// Get container ID from URL or use default
+// Get container ID from URL only
 const urlParams = new URLSearchParams(window.location.search);
 containerId = urlParams.get('container');
 
@@ -79,6 +79,7 @@ function initTerminal() {
 // Initialize Socket.IO connection
 function initSocket() {
     socket = io();
+    window.socket = socket; // Make it globally accessible for debugging
 
     socket.on('connect', () => {
         console.log('Connected to server');
@@ -87,11 +88,19 @@ function initSocket() {
         // Hide loading spinner
         document.getElementById('loading').style.display = 'none';
 
-        // If we have a container ID, attach to it
-        if (containerId) {
-            socket.emit('attach', { containerId });
+        // Only use container ID from URL, never from cache
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentContainerId = urlParams.get('container');
+        
+        if (currentContainerId) {
+            containerId = currentContainerId;
+            socket.emit('attach', { 
+                containerId: currentContainerId,
+                cols: term.cols,
+                rows: term.rows
+            });
         } else {
-            // Otherwise, get the first available container
+            // No container ID in URL, fetch available containers
             fetchContainerList();
         }
     });
@@ -101,8 +110,7 @@ function initSocket() {
         containerId = data.containerId;
         updateStatus('connected', `Connected to ${data.containerId.substring(0, 12)}`);
         
-        // Clear terminal and show prompt
-        term.clear();
+        // Don't clear terminal on attach - preserve existing content
         
         // Send initial resize
         socket.emit('resize', {
@@ -112,6 +120,10 @@ function initSocket() {
     });
 
     socket.on('output', (data) => {
+        // Convert ArrayBuffer to Uint8Array if needed
+        if (data instanceof ArrayBuffer) {
+            data = new Uint8Array(data);
+        }
         term.write(data);
     });
 
@@ -129,6 +141,16 @@ function initSocket() {
         console.error('Socket error:', error);
         updateStatus('error', 'Error: ' + error.message);
         term.writeln('\r\n\x1b[1;31mError: ' + error.message + '\x1b[0m');
+        
+        // If container not found, try to get a new one
+        if (error.message && error.message.includes('no such container')) {
+            containerId = null;
+            
+            // Try to fetch available containers
+            setTimeout(() => {
+                fetchContainerList();
+            }, 1000);
+        }
     });
 }
 
@@ -141,7 +163,11 @@ async function fetchContainerList() {
         if (containers.length > 0) {
             // Use the first container
             containerId = containers[0].Id;
-            socket.emit('attach', { containerId });
+            socket.emit('attach', { 
+                containerId,
+                cols: term.cols,
+                rows: term.rows
+            });
         } else {
             updateStatus('error', 'No containers found');
             term.writeln('\x1b[1;31mNo Claude Code Sandbox containers found.\x1b[0m');
@@ -168,9 +194,16 @@ function clearTerminal() {
 }
 
 function reconnect() {
-    if (socket) {
+    if (socket && containerId) {
+        // Clear terminal
+        term.clear();
+        term.writeln('\x1b[90mReconnecting...\x1b[0m');
+        
+        // Disconnect and reconnect
         socket.disconnect();
-        socket.connect();
+        setTimeout(() => {
+            socket.connect();
+        }, 100);
     }
 }
 

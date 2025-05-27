@@ -5,12 +5,19 @@ import path from 'path';
 import Docker from 'dockerode';
 import chalk from 'chalk';
 
+interface SessionInfo {
+  containerId: string;
+  exec?: any;
+  stream?: any;
+}
+
 export class WebUIServer {
   private app: express.Application;
   private httpServer: any;
   private io: Server;
   private docker: Docker;
   private activeStreams: Map<string, any> = new Map();
+  private sessions: Map<string, SessionInfo> = new Map(); // container -> session mapping
   private port: number = 3456;
 
   constructor(docker: Docker) {
@@ -61,41 +68,110 @@ export class WebUIServer {
         try {
           const container = this.docker.getContainer(containerId);
           
-          // Create exec instance for interactive terminal
-          const exec = await container.exec({
-            AttachStdin: true,
-            AttachStdout: true,
-            AttachStderr: true,
-            Tty: true,
-            Cmd: ['/bin/bash', '-l'],
-            WorkingDir: '/workspace'
+          // Check if we already have a session for this container
+          let session = this.sessions.get(containerId);
+          
+          if (!session || !session.stream) {
+            // No existing session, attach to container's main TTY
+            console.log(chalk.blue('Attaching to container TTY...'));
+            
+            // Always use exec to create a new interactive session
+            console.log(chalk.blue('Creating interactive session...'));
+            const exec = await container.exec({
+              AttachStdin: true,
+              AttachStdout: true,
+              AttachStderr: true,
+              Tty: true,
+              Cmd: ['claude', '--dangerously-skip-permissions'],
+              WorkingDir: '/workspace',
+              User: 'claude',
+              Env: [
+                'TERM=xterm-256color',
+                'COLORTERM=truecolor'
+              ]
+            });
+
+            const stream = await exec.start({
+              hijack: true,
+              stdin: true
+            });
+            
+            session = { containerId, exec, stream };
+            this.sessions.set(containerId, session);
+            
+            console.log(chalk.green('Claude started successfully'));
+          }
+          
+          // Store stream reference for this socket
+          this.activeStreams.set(socket.id, { 
+            stream: session.stream, 
+            exec: session.exec,
+            containerId 
           });
 
-          const stream = await exec.start({
-            hijack: true,
-            stdin: true
-          });
-
-          // Store stream reference
-          this.activeStreams.set(socket.id, { stream, exec });
-
-          // Handle output from container
-          stream.on('data', (chunk: Buffer) => {
-            socket.emit('output', chunk.toString('utf8'));
-          });
-
-          stream.on('error', (err: Error) => {
+          // Set up data handler for this specific socket
+          const dataHandler = (chunk: Buffer) => {
+            // Docker hijacked streams have a special format with headers
+            // We need to strip these headers to get the actual data
+            if (chunk.length > 8) {
+              // Check if this looks like a Docker header (first byte is 1, 2, or 3)
+              const firstByte = chunk[0];
+              if (firstByte >= 1 && firstByte <= 3) {
+                // This is likely a Docker header, skip the first 8 bytes
+                const data = chunk.slice(8);
+                if (data.length > 0) {
+                  // Convert Buffer to Uint8Array for proper transmission
+                  socket.emit('output', new Uint8Array(data));
+                }
+              } else {
+                // No header, send as-is
+                socket.emit('output', new Uint8Array(chunk));
+              }
+            } else {
+              // Small chunk, send as-is
+              socket.emit('output', new Uint8Array(chunk));
+            }
+          };
+          
+          const errorHandler = (err: Error) => {
             console.error(chalk.red('Stream error:'), err);
             socket.emit('error', { message: err.message });
-          });
-
-          stream.on('end', () => {
+          };
+          
+          const endHandler = () => {
             socket.emit('container-disconnected');
             this.activeStreams.delete(socket.id);
-          });
+            // Clean up handlers
+            session.stream.removeListener('data', dataHandler);
+            session.stream.removeListener('error', errorHandler);
+            session.stream.removeListener('end', endHandler);
+          };
+
+          // Attach handlers
+          session.stream.on('data', dataHandler);
+          session.stream.on('error', errorHandler);
+          session.stream.on('end', endHandler);
+          
+          // Store handlers for cleanup
+          this.activeStreams.get(socket.id)!.handlers = {
+            data: dataHandler,
+            error: errorHandler,
+            end: endHandler
+          };
 
           // Confirm attachment
           socket.emit('attached', { containerId });
+          
+          // Send initial resize after a small delay to ensure exec is ready
+          if (session.exec && data.cols && data.rows) {
+            setTimeout(async () => {
+              try {
+                await session.exec.resize({ w: data.cols, h: data.rows });
+              } catch (e) {
+                // Ignore resize errors, exec might not support resize
+              }
+            }, 100);
+          }
 
         } catch (error: any) {
           console.error(chalk.red('Failed to attach to container:'), error);
@@ -126,10 +202,19 @@ export class WebUIServer {
       socket.on('disconnect', () => {
         console.log(chalk.yellow('Client disconnected from web UI'));
         const streamInfo = this.activeStreams.get(socket.id);
-        if (streamInfo?.stream) {
-          streamInfo.stream.end();
+        
+        if (streamInfo) {
+          // Clean up event handlers if they exist
+          if (streamInfo.handlers && streamInfo.stream) {
+            streamInfo.stream.removeListener('data', streamInfo.handlers.data);
+            streamInfo.stream.removeListener('error', streamInfo.handlers.error);
+            streamInfo.stream.removeListener('end', streamInfo.handlers.end);
+          }
+          
+          // Don't end the stream - keep the session alive for reconnection
+          // Only remove this socket's reference
+          this.activeStreams.delete(socket.id);
         }
-        this.activeStreams.delete(socket.id);
       });
     });
   }
