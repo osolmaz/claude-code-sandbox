@@ -169,6 +169,12 @@ function onIdleDetected() {
                 originalPageTitle = document.title;
             }
             document.title = '⚠️ Input needed - ' + originalPageTitle;
+            
+            // Trigger file sync
+            if (socket && containerId) {
+                console.log('[SYNC] Triggering file sync due to input needed...');
+                socket.emit('input-needed', { containerId });
+            }
         }
     }
 }
@@ -434,6 +440,21 @@ function initSocket() {
         }
     });
 
+    socket.on('sync-complete', (data) => {
+        console.log('[SYNC] Sync completed:', data);
+        if (data.hasChanges) {
+            updateStatus('connected', `📁 Changes synced: ${data.summary}`);
+            showGitWorkflow(data);
+        } else {
+            updateStatus('connected', '✨ No changes to sync');
+        }
+    });
+
+    socket.on('sync-error', (error) => {
+        console.error('[SYNC] Sync error:', error);
+        updateStatus('error', `Sync failed: ${error.message}`);
+    });
+
     socket.on('error', (error) => {
         console.error('Socket error:', error);
         updateStatus('error', 'Error: ' + error.message);
@@ -560,6 +581,388 @@ document.addEventListener('DOMContentLoaded', () => {
         set: (value) => { notificationSound = value; }
     });
 });
+
+// Git workflow functions
+function showGitWorkflow(syncData) {
+    // Remove any existing git workflow modal
+    const existingModal = document.getElementById('git-workflow-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'git-workflow-modal';
+    modal.innerHTML = `
+        <div class="git-modal-overlay" onclick="closeGitWorkflow()">
+            <div class="git-modal-content" onclick="event.stopPropagation()">
+                <div class="git-modal-header">
+                    <h2>📁 Git Changes Review</h2>
+                    <button onclick="closeGitWorkflow()" class="close-btn">×</button>
+                </div>
+                
+                <div class="git-modal-body">
+                    <div class="changes-summary">
+                        <strong>Changes Summary:</strong> ${syncData.summary}
+                    </div>
+                    
+                    <div class="diff-viewer" id="diff-viewer">
+                        ${formatDiffForDisplay(syncData.diffData)}
+                    </div>
+                    
+                    <div class="commit-section">
+                        <h3>💾 Commit Changes</h3>
+                        <textarea 
+                            id="commit-message" 
+                            placeholder="Enter commit message..."
+                            rows="3"
+                        >Update files from Claude
+
+${syncData.summary}</textarea>
+                        
+                        <div class="commit-actions">
+                            <button onclick="commitChanges('${syncData.containerId}')" class="btn btn-primary">
+                                Commit Changes
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="push-section" id="push-section" style="display: none;">
+                        <h3>🚀 Push to Remote</h3>
+                        <div class="branch-input">
+                            <label for="branch-name">Branch name:</label>
+                            <input type="text" id="branch-name" placeholder="claude-changes" value="claude-changes">
+                        </div>
+                        <div class="push-actions">
+                            <button onclick="pushChanges('${syncData.containerId}')" class="btn btn-success">
+                                Push to Remote
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    
+    // Add CSS styles if not already present
+    if (!document.getElementById('git-workflow-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'git-workflow-styles';
+        styles.textContent = `
+            .git-modal-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+            }
+            
+            .git-modal-content {
+                background: #1e1e1e;
+                border: 1px solid #444;
+                border-radius: 8px;
+                width: 90%;
+                max-width: 800px;
+                max-height: 90vh;
+                overflow-y: auto;
+                color: #fff;
+            }
+            
+            .git-modal-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 20px;
+                border-bottom: 1px solid #444;
+            }
+            
+            .git-modal-header h2 {
+                margin: 0;
+                color: #fff;
+            }
+            
+            .close-btn {
+                background: none;
+                border: none;
+                color: #fff;
+                font-size: 24px;
+                cursor: pointer;
+                padding: 0;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            
+            .close-btn:hover {
+                background: #444;
+                border-radius: 4px;
+            }
+            
+            .git-modal-body {
+                padding: 20px;
+            }
+            
+            .changes-summary {
+                background: #2d2d2d;
+                padding: 15px;
+                border-radius: 6px;
+                margin-bottom: 20px;
+                border-left: 4px solid #4CAF50;
+            }
+            
+            .diff-viewer {
+                background: #0d1117;
+                border: 1px solid #30363d;
+                border-radius: 6px;
+                padding: 15px;
+                margin-bottom: 20px;
+                font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+                font-size: 13px;
+                line-height: 1.45;
+                overflow-x: auto;
+                max-height: 300px;
+                overflow-y: auto;
+            }
+            
+            .diff-line {
+                padding: 2px 0;
+                white-space: pre;
+            }
+            
+            .diff-line.added {
+                background: rgba(46, 160, 67, 0.15);
+                color: #3fb950;
+            }
+            
+            .diff-line.removed {
+                background: rgba(248, 81, 73, 0.15);
+                color: #f85149;
+            }
+            
+            .diff-line.context {
+                color: #e6edf3;
+            }
+            
+            .diff-line.header {
+                color: #7d8590;
+                font-weight: bold;
+            }
+            
+            .commit-section, .push-section {
+                background: #2d2d2d;
+                padding: 20px;
+                border-radius: 6px;
+                margin-bottom: 15px;
+            }
+            
+            .commit-section h3, .push-section h3 {
+                margin: 0 0 15px 0;
+                color: #fff;
+            }
+            
+            #commit-message {
+                width: 100%;
+                background: #0d1117;
+                border: 1px solid #30363d;
+                border-radius: 6px;
+                padding: 12px;
+                color: #e6edf3;
+                font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+                font-size: 14px;
+                resize: vertical;
+                margin-bottom: 15px;
+            }
+            
+            .branch-input {
+                margin-bottom: 15px;
+            }
+            
+            .branch-input label {
+                display: block;
+                margin-bottom: 5px;
+                color: #e6edf3;
+            }
+            
+            #branch-name {
+                width: 200px;
+                background: #0d1117;
+                border: 1px solid #30363d;
+                border-radius: 6px;
+                padding: 8px 12px;
+                color: #e6edf3;
+                font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+            }
+            
+            .btn {
+                background: #238636;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+            }
+            
+            .btn:hover {
+                background: #2ea043;
+            }
+            
+            .btn:disabled {
+                background: #484f58;
+                cursor: not-allowed;
+            }
+            
+            .btn-primary {
+                background: #1f6feb;
+            }
+            
+            .btn-primary:hover {
+                background: #388bfd;
+            }
+            
+            .btn-success {
+                background: #238636;
+            }
+            
+            .btn-success:hover {
+                background: #2ea043;
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+}
+
+function formatDiffForDisplay(diffData) {
+    if (!diffData) return '<div class="diff-line context">No changes to display</div>';
+    
+    const lines = [];
+    
+    // Show file status
+    if (diffData.status) {
+        lines.push('<div class="diff-line header">📄 File Status:</div>');
+        diffData.status.split('\n').forEach(line => {
+            if (line.trim()) {
+                const status = line.substring(0, 2);
+                const filename = line.substring(3);
+                let statusText = '';
+                if (status === '??') statusText = 'New file';
+                else if (status === ' M') statusText = 'Modified';
+                else if (status === ' D') statusText = 'Deleted';
+                else if (status === 'A ') statusText = 'Added';
+                
+                lines.push(`<div class="diff-line context">  ${statusText}: ${filename}</div>`);
+            }
+        });
+        lines.push('<div class="diff-line context"></div>');
+    }
+    
+    // Show diff
+    if (diffData.diff) {
+        lines.push('<div class="diff-line header">📝 Changes:</div>');
+        diffData.diff.split('\n').forEach(line => {
+            let className = 'context';
+            if (line.startsWith('+')) className = 'added';
+            else if (line.startsWith('-')) className = 'removed';
+            else if (line.startsWith('@@')) className = 'header';
+            
+            lines.push(`<div class="diff-line ${className}">${escapeHtml(line)}</div>`);
+        });
+    }
+    
+    // Show untracked files
+    if (diffData.untrackedFiles && diffData.untrackedFiles.length > 0) {
+        lines.push('<div class="diff-line context"></div>');
+        lines.push('<div class="diff-line header">📁 New Files:</div>');
+        diffData.untrackedFiles.forEach(filename => {
+            lines.push(`<div class="diff-line added">+ ${filename}</div>`);
+        });
+    }
+    
+    return lines.join('');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function closeGitWorkflow() {
+    const modal = document.getElementById('git-workflow-modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function commitChanges(containerId) {
+    const commitMessage = document.getElementById('commit-message').value.trim();
+    if (!commitMessage) {
+        alert('Please enter a commit message');
+        return;
+    }
+    
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Committing...';
+    
+    socket.emit('commit-changes', { containerId, commitMessage });
+    
+    // Handle commit result
+    socket.once('commit-success', () => {
+        btn.textContent = '✓ Committed';
+        btn.style.background = '#238636';
+        
+        // Show push section
+        document.getElementById('push-section').style.display = 'block';
+        
+        updateStatus('connected', '✓ Changes committed successfully');
+    });
+    
+    socket.once('commit-error', (error) => {
+        btn.disabled = false;
+        btn.textContent = 'Commit Changes';
+        alert('Commit failed: ' + error.message);
+        updateStatus('error', 'Commit failed: ' + error.message);
+    });
+}
+
+function pushChanges(containerId) {
+    const branchName = document.getElementById('branch-name').value.trim() || 'claude-changes';
+    
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Pushing...';
+    
+    socket.emit('push-changes', { containerId, branchName });
+    
+    // Handle push result
+    socket.once('push-success', () => {
+        btn.textContent = '✓ Pushed';
+        btn.style.background = '#238636';
+        updateStatus('connected', `✓ Changes pushed to ${branchName}`);
+        
+        setTimeout(() => {
+            closeGitWorkflow();
+        }, 2000);
+    });
+    
+    socket.once('push-error', (error) => {
+        btn.disabled = false;
+        btn.textContent = 'Push to Remote';
+        alert('Push failed: ' + error.message);
+        updateStatus('error', 'Push failed: ' + error.message);
+    });
+}
 
 // Handle keyboard shortcuts
 document.addEventListener('keydown', (e) => {

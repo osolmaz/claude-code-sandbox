@@ -74,6 +74,10 @@ export class ClaudeSandbox {
       // Launch web UI if requested
       if (this.config.webUI) {
         this.webServer = new WebUIServer(this.docker);
+        
+        // Pass repo info to web server
+        this.webServer.setRepoInfo(process.cwd(), branchName);
+        
         const webUrl = await this.webServer.start();
         
         // Open browser to the web UI with container ID

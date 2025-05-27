@@ -4,6 +4,11 @@ import { Server } from 'socket.io';
 import path from 'path';
 import Docker from 'dockerode';
 import chalk from 'chalk';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { ShadowRepository } from './git/shadow-repository';
+
+const execAsync = promisify(exec);
 
 interface SessionInfo {
   containerId: string;
@@ -20,6 +25,9 @@ export class WebUIServer {
   private docker: Docker;
   private sessions: Map<string, SessionInfo> = new Map(); // container -> session mapping
   private port: number = 3456;
+  private shadowRepos: Map<string, ShadowRepository> = new Map(); // container -> shadow repo
+  private originalRepo: string = '';
+  private currentBranch: string = 'main';
 
   constructor(docker: Docker) {
     this.docker = docker;
@@ -226,6 +234,139 @@ export class WebUIServer {
         }
       });
 
+      socket.on('input-needed', async (data) => {
+        const { containerId } = data;
+        console.log(chalk.blue('🔔 Input needed detected, triggering sync...'));
+        
+        try {
+          // Initialize shadow repo if not exists
+          if (!this.shadowRepos.has(containerId)) {
+            const shadowRepo = new ShadowRepository({
+              originalRepo: this.originalRepo || process.cwd(),
+              claudeBranch: this.currentBranch || 'claude-changes',
+              sessionId: containerId.substring(0, 12)
+            });
+            this.shadowRepos.set(containerId, shadowRepo);
+          }
+          
+          // Sync files from container
+          const shadowRepo = this.shadowRepos.get(containerId)!;
+          await shadowRepo.syncFromContainer(containerId);
+          
+          // Get changes summary and diff data
+          const changes = await shadowRepo.getChanges();
+          let diffData = null;
+          
+          if (changes.hasChanges) {
+            // Get detailed file status and diffs
+            const { stdout: statusOutput } = await execAsync('git status --porcelain', { 
+              cwd: shadowRepo.getPath() 
+            });
+            
+            const { stdout: diffOutput } = await execAsync('git diff HEAD', { 
+              cwd: shadowRepo.getPath(),
+              maxBuffer: 1024 * 1024 // 1MB limit
+            });
+            
+            // Get list of untracked files with their content
+            const untrackedFiles: string[] = [];
+            const statusLines = statusOutput.split('\n').filter(line => line.startsWith('??'));
+            for (const line of statusLines) {
+              const filename = line.substring(3);
+              untrackedFiles.push(filename);
+            }
+            
+            diffData = {
+              status: statusOutput,
+              diff: diffOutput,
+              untrackedFiles: untrackedFiles
+            };
+          }
+          
+          // Send summary back to client
+          socket.emit('sync-complete', {
+            hasChanges: changes.hasChanges,
+            summary: changes.summary,
+            shadowPath: shadowRepo.getPath(),
+            diffData: diffData,
+            containerId: containerId
+          });
+          
+        } catch (error: any) {
+          console.error(chalk.red('Sync failed:'), error);
+          socket.emit('sync-error', { message: error.message });
+        }
+      });
+
+      // Handle commit operation
+      socket.on('commit-changes', async (data) => {
+        const { containerId, commitMessage } = data;
+        
+        try {
+          const shadowRepo = this.shadowRepos.get(containerId);
+          if (!shadowRepo) {
+            throw new Error('Shadow repository not found');
+          }
+          
+          const shadowPath = shadowRepo.getPath();
+          
+          // Stage all changes
+          await execAsync('git add .', { cwd: shadowPath });
+          
+          // Create commit
+          await execAsync(`git commit -m "${commitMessage.replace(/"/g, '\\"')}"`, { 
+            cwd: shadowPath 
+          });
+          
+          console.log(chalk.green('✓ Changes committed'));
+          socket.emit('commit-success', { message: 'Changes committed successfully' });
+          
+        } catch (error: any) {
+          console.error(chalk.red('Commit failed:'), error);
+          socket.emit('commit-error', { message: error.message });
+        }
+      });
+
+      // Handle push operation  
+      socket.on('push-changes', async (data) => {
+        const { containerId, branchName } = data;
+        
+        try {
+          const shadowRepo = this.shadowRepos.get(containerId);
+          if (!shadowRepo) {
+            throw new Error('Shadow repository not found');
+          }
+          
+          const shadowPath = shadowRepo.getPath();
+          
+          // Create and switch to new branch if specified
+          if (branchName && branchName !== 'main') {
+            try {
+              await execAsync(`git checkout -b ${branchName}`, { cwd: shadowPath });
+            } catch (error) {
+              // Branch might already exist, try to switch
+              await execAsync(`git checkout ${branchName}`, { cwd: shadowPath });
+            }
+          }
+          
+          // Push to remote
+          const { stdout: remoteOutput } = await execAsync('git remote -v', { cwd: shadowPath });
+          if (remoteOutput.includes('origin')) {
+            // Get current branch name if not specified
+            const pushBranch = branchName || await execAsync('git branch --show-current', { cwd: shadowPath }).then(r => r.stdout.trim());
+            await execAsync(`git push -u origin ${pushBranch}`, { cwd: shadowPath });
+            console.log(chalk.green('✓ Changes pushed to remote'));
+            socket.emit('push-success', { message: 'Changes pushed successfully' });
+          } else {
+            throw new Error('No remote origin configured');
+          }
+          
+        } catch (error: any) {
+          console.error(chalk.red('Push failed:'), error);
+          socket.emit('push-error', { message: error.message });
+        }
+      });
+
       socket.on('disconnect', () => {
         console.log(chalk.yellow('Client disconnected from web UI'));
         
@@ -261,7 +402,17 @@ export class WebUIServer {
     });
   }
 
+  setRepoInfo(originalRepo: string, branch: string): void {
+    this.originalRepo = originalRepo;
+    this.currentBranch = branch;
+  }
+
   async stop(): Promise<void> {
+    // Clean up shadow repos
+    for (const [, shadowRepo] of this.shadowRepos) {
+      await shadowRepo.cleanup();
+    }
+    
     // Clean up all sessions
     for (const [, session] of this.sessions) {
       if (session.stream) {
