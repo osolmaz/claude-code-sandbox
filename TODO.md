@@ -1,7 +1,7 @@
 - [x] Fix terminal output
 - [x] There is too much orchestration overhead to manage locally, so we need a UI to control, view, and do stuff outside of the container. The best thing is probably to create a web UI to be run locally, and the user will be redirected to this UI when they start a web app locally.
 - [x] Flag for including vs not including non-tracked files
+- [x] Specify with a flag which branch to switch to on container start
 - [ ] Create listener for Claude turn end, to commit, push and create a PR
   - [ ] GH token should not be copied into the container, huge security risk
-- [x] Specify with a flag which branch to switch to on container start
 - [ ] Being able to specify which setup commands to run before and after the copying of Git files.
