@@ -16,7 +16,7 @@ const IDLE_THRESHOLD = 1500; // 1.5 seconds of no output means waiting for input
 const NOTIFICATION_COOLDOWN = 2000; // 2 seconds between notifications
 
 // Claude's loading animation characters (unique characters only)
-const LOADING_CHARS = ["✢", "✳", "✶", "✻", "✽", "✻", "✢", "·"];
+const LOADING_CHARS = ["✢", "✶", "✻", "✽", "✻", "✢", "·"];
 const UNIQUE_LOADING_CHARS = new Set(LOADING_CHARS);
 
 // Create notification sound using Web Audio API
@@ -123,10 +123,18 @@ function resetIdleTimer() {
 }
 
 function onIdleDetected() {
+    console.log('[IDLE] Idle detected. State:', {
+        isWaitingForInput,
+        isWaitingForLoadingAnimation,
+        seenLoadingCharsCount: seenLoadingChars.size,
+        requiredCharsCount: UNIQUE_LOADING_CHARS.size
+    });
+
     // Claude has stopped outputting for 1.5 seconds - likely waiting for input
     // But only trigger if we're not waiting for loading animation or have seen all chars
     if (!isWaitingForInput && (!isWaitingForLoadingAnimation || seenLoadingChars.size === UNIQUE_LOADING_CHARS.size)) {
         isWaitingForInput = true;
+        console.log('[IDLE] ✓ Triggering input needed notification');
 
         // Check cooldown to avoid spamming notifications
         const now = Date.now();
@@ -173,18 +181,42 @@ function onIdleDetected() {
 
 // Check if output contains loading characters
 function checkForLoadingChars(text) {
-    for (const char of text) {
-        if (LOADING_CHARS.includes(char)) {
-            seenLoadingChars.add(char);
+    // Strip ANSI escape sequences to get plain text
+    // This regex handles color codes, cursor movements, and other escape sequences
+    const stripAnsi = (str) => str.replace(/[\x1b\x9b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+    const plainText = stripAnsi(text);
 
-            // If we've seen all unique loading chars, we can stop waiting
-            if (seenLoadingChars.size === UNIQUE_LOADING_CHARS.size && isWaitingForLoadingAnimation) {
-                console.log('Seen all loading characters, Claude has started processing');
-                isWaitingForLoadingAnimation = false;
-                // Reset the idle timer now that we know Claude is processing
-                resetIdleTimer();
+    let foundChars = [];
+    // Check both the original text and stripped text
+    const textsToCheck = [text, plainText];
+
+    for (const textToCheck of textsToCheck) {
+        for (const char of textToCheck) {
+            if (LOADING_CHARS.includes(char)) {
+                seenLoadingChars.add(char);
+                foundChars.push(char);
             }
         }
+    }
+
+    if (foundChars.length > 0) {
+        console.log(`[LOADING] Found loading chars: ${foundChars.join(', ')} | Total seen: ${Array.from(seenLoadingChars).join(', ')} (${seenLoadingChars.size}/${UNIQUE_LOADING_CHARS.size})`);
+
+        // Debug: show hex values if we're missing chars
+        if (seenLoadingChars.size < UNIQUE_LOADING_CHARS.size && text.length < 50) {
+            const hexView = Array.from(text).map(c =>
+                `${c}(${c.charCodeAt(0).toString(16)})`
+            ).join(' ');
+            console.log(`[LOADING] Hex view: ${hexView}`);
+        }
+    }
+
+    // If we've seen all unique loading chars, we can stop waiting
+    if (seenLoadingChars.size === UNIQUE_LOADING_CHARS.size && isWaitingForLoadingAnimation) {
+        console.log('[LOADING] ✓ Seen all loading characters, Claude has started processing');
+        isWaitingForLoadingAnimation = false;
+        // Reset the idle timer now that we know Claude is processing
+        resetIdleTimer();
     }
 }
 
@@ -262,7 +294,8 @@ function initTerminal() {
                 isWaitingForInput = false;
                 isWaitingForLoadingAnimation = true;
                 seenLoadingChars.clear(); // Clear seen loading chars
-                console.log('User provided input, waiting for loading animation...');
+                console.log('[STATE] User provided input, waiting for loading animation...');
+                console.log('[STATE] Need to see these chars:', Array.from(UNIQUE_LOADING_CHARS).join(', '));
             }
         }
     });
@@ -333,6 +366,21 @@ function initSocket() {
         // Check for loading characters if we're waiting for them
         if (isWaitingForLoadingAnimation) {
             checkForLoadingChars(text);
+        } else if (text.length > 0) {
+            // Check if loading chars are present in either raw or stripped text
+            const stripAnsi = (str) => str.replace(/[\x1b\x9b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+            const plainText = stripAnsi(text);
+
+            const foundInRaw = LOADING_CHARS.filter(char => text.includes(char));
+            const foundInPlain = LOADING_CHARS.filter(char => plainText.includes(char));
+
+            if (foundInRaw.length > 0 || foundInPlain.length > 0) {
+                console.log('[DEBUG] Loading chars present but not tracking:', {
+                    raw: foundInRaw.join(', '),
+                    plain: foundInPlain.join(', '),
+                    hasAnsi: text !== plainText
+                });
+            }
         }
 
         // Reset idle timer on any output
