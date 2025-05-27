@@ -328,6 +328,72 @@ program
     }
   });
 
+// Purge command - stop and remove all containers
+program
+  .command("purge")
+  .description("Stop and remove all Claude Sandbox containers")
+  .option("-y, --yes", "Skip confirmation prompt")
+  .action(async (options) => {
+    try {
+      const containers = await getClaudeSandboxContainers();
+      
+      if (containers.length === 0) {
+        console.log(chalk.yellow("No Claude Sandbox containers found."));
+        return;
+      }
+      
+      // Show what will be removed
+      console.log(chalk.yellow(`Found ${containers.length} Claude Sandbox container(s):`));
+      containers.forEach(c => {
+        console.log(`  ${c.Id.substring(0, 12)} - ${c.Names[0].replace('/', '')} - ${c.State}`);
+      });
+      
+      // Confirm unless -y flag is used
+      if (!options.yes) {
+        const { confirm } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'confirm',
+          message: 'Are you sure you want to stop and remove all containers?',
+          default: false
+        }]);
+        
+        if (!confirm) {
+          console.log(chalk.gray("Purge cancelled."));
+          return;
+        }
+      }
+      
+      const spinner = ora("Purging containers...").start();
+      let removed = 0;
+      
+      for (const c of containers) {
+        try {
+          const container = docker.getContainer(c.Id);
+          spinner.text = `Stopping ${c.Id.substring(0, 12)}...`;
+          
+          if (c.State === 'running') {
+            await container.stop({ t: 5 }); // 5 second timeout
+          }
+          
+          spinner.text = `Removing ${c.Id.substring(0, 12)}...`;
+          await container.remove();
+          removed++;
+        } catch (error: any) {
+          spinner.warn(`Failed to remove ${c.Id.substring(0, 12)}: ${error.message}`);
+        }
+      }
+      
+      if (removed === containers.length) {
+        spinner.succeed(chalk.green(`✓ Purged all ${removed} container(s)`));
+      } else {
+        spinner.warn(chalk.yellow(`Purged ${removed} of ${containers.length} container(s)`));
+      }
+    } catch (error: any) {
+      console.error(chalk.red(`Purge failed: ${error.message}`));
+      process.exit(1);
+    }
+  });
+
 // Config command - show configuration
 program
   .command("config")
