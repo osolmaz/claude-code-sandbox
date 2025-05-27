@@ -23,6 +23,7 @@ export interface SandboxConfig {
   bashTimeout?: number;
   webUI?: boolean;
   includeUntracked?: boolean;
+  targetBranch?: string;
 }
 
 export interface Credentials {

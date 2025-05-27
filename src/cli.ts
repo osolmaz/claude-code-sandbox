@@ -71,6 +71,7 @@ program
   .option("--no-push", "Disable automatic branch pushing")
   .option("--no-pr", "Disable automatic PR creation")
   .option("--include-untracked", "Include untracked files when copying to container")
+  .option("-b, --branch <branch>", "Switch to specific branch on container start (creates if doesn't exist)")
   .action(async (options) => {
     console.log(chalk.blue("🚀 Starting new Claude Sandbox container..."));
     
@@ -81,6 +82,7 @@ program
     config.autoPush = options.push !== false;
     config.autoCreatePR = options.pr !== false;
     config.includeUntracked = options.includeUntracked || false;
+    config.targetBranch = options.branch;
     
     const sandbox = new ClaudeSandbox(config);
     await sandbox.run();

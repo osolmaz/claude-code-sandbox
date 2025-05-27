@@ -38,12 +38,14 @@ export class ClaudeSandbox {
       const currentBranch = await this.git.branchLocal();
       console.log(chalk.blue(`Current branch: ${currentBranch.current}`));
 
-      // Generate branch name (but don't switch yet)
-      const timestamp = new Date()
-        .toISOString()
-        .replace(/[:.]/g, "-")
-        .split("T")[0];
-      const branchName = `claude/${timestamp}-${Date.now()}`;
+      // Use target branch from config or generate one
+      const branchName = this.config.targetBranch || (() => {
+        const timestamp = new Date()
+          .toISOString()
+          .replace(/[:.]/g, "-")
+          .split("T")[0];
+        return `claude/${timestamp}-${Date.now()}`;
+      })();
       console.log(chalk.blue(`Will create branch in container: ${branchName}`));
 
       // Discover credentials (optional - don't fail if not found)

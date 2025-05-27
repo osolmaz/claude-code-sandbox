@@ -492,9 +492,10 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
 
     console.log(chalk.blue("• Connecting to container..."));
 
-    // Use provided branch name or generate one
+    // Use provided branch name, config target branch, or generate one
     const targetBranch =
       branchName ||
+      this.config.targetBranch ||
       `claude/${
         new Date().toISOString().replace(/[:.]/g, "-").split("T")[0]
       }-${Date.now()}`;
@@ -537,8 +538,14 @@ exec /bin/bash`;
             git config --global url."https://\${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
             echo "✓ Configured git to use GitHub token"
           fi &&
-          git checkout -b "${targetBranch}" &&
-          echo "✓ Created branch: ${targetBranch}" &&
+          # Try to checkout existing branch first, then create new if it doesn't exist
+          if git show-ref --verify --quiet refs/heads/"${targetBranch}"; then
+            git checkout "${targetBranch}" &&
+            echo "✓ Switched to existing branch: ${targetBranch}"
+          else
+            git checkout -b "${targetBranch}" &&
+            echo "✓ Created new branch: ${targetBranch}"
+          fi &&
           echo '${startupScript}' > /home/claude/start-session.sh &&
           chmod +x /home/claude/start-session.sh &&
           echo "✓ Startup script created"
