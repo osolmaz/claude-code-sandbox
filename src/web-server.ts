@@ -284,12 +284,31 @@ export class WebUIServer {
 
   async openInBrowser(url: string): Promise<void> {
     try {
+      // Try the open module first
       const open = (await import('open')).default;
       await open(url);
       console.log(chalk.blue('✓ Opened browser'));
+      return;
     } catch (error) {
-      console.log(chalk.yellow('Could not open browser automatically'));
-      console.log(chalk.yellow(`Please open ${url} in your browser`));
+      // Fallback to platform-specific commands
+      try {
+        const { execSync } = require('child_process');
+        const platform = process.platform;
+        
+        if (platform === 'darwin') {
+          execSync(`open "${url}"`, { stdio: 'ignore' });
+        } else if (platform === 'win32') {
+          execSync(`start "" "${url}"`, { stdio: 'ignore' });
+        } else {
+          // Linux/Unix
+          execSync(`xdg-open "${url}" || firefox "${url}" || google-chrome "${url}"`, { stdio: 'ignore' });
+        }
+        console.log(chalk.blue('✓ Opened browser'));
+        return;
+      } catch (fallbackError) {
+        console.log(chalk.yellow('Could not open browser automatically'));
+        console.log(chalk.yellow(`Please open ${url} in your browser`));
+      }
     }
   }
 }
