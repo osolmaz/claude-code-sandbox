@@ -12,7 +12,7 @@ The primary goal of Claude Code Sandbox is to enable **full async agentic workfl
 - Create commits and manage git operations
 - Work continuously without interrupting the user
 
-This creates a truly autonomous development assistant that can work asynchronously while you focus on other tasks, similar to [OpenAI Codex](https://chatgpt.com/codex) or [Google Jules](https://jules.dev), but running locally on your machine.
+Access Claude through a **browser-based terminal** that lets you monitor and interact with the AI assistant while you work on other tasks. This creates a truly autonomous development assistant, similar to [OpenAI Codex](https://chatgpt.com/codex) or [Google Jules](https://jules.dev), but running locally on your machine with full control.
 
 ## Overview
 
@@ -46,7 +46,7 @@ npm link  # Creates global 'claude-sandbox' command
 
 ## Usage
 
-### Basic Usage
+### Quick Start
 
 Simply run in any git repository:
 
@@ -55,26 +55,90 @@ claude-sandbox
 ```
 
 This will:
-
 1. Create a new branch (`claude/[timestamp]`)
 2. Start a Docker container with Claude Code
-3. Forward your credentials automatically
-4. Open an interactive session with Claude
+3. Launch a web UI at `http://localhost:3456`
+4. Open your browser automatically
 
-### Command Options
+### Commands
 
+#### `claude-sandbox` (default)
+Start a new container with web UI (recommended):
 ```bash
-claude-sandbox [options]
+claude-sandbox
+```
+
+#### `claude-sandbox start`
+Explicitly start a new container with options:
+```bash
+claude-sandbox start [options]
 
 Options:
-  -c, --config <path>    Path to configuration file (default: ./claude-sandbox.config.json)
-  -d, --detached         Run in detached mode
+  -c, --config <path>    Configuration file (default: ./claude-sandbox.config.json)
   -n, --name <name>      Container name prefix
+  --no-web               Disable web UI (use terminal attach)
   --no-push              Disable automatic branch pushing
   --no-pr                Disable automatic PR creation
-  -w, --web              Launch web UI for terminal access
-  -h, --help             Display help
-  -V, --version          Display version
+```
+
+#### `claude-sandbox attach [container-id]`
+Attach to an existing container:
+```bash
+# Interactive selection
+claude-sandbox attach
+
+# Specific container
+claude-sandbox attach abc123def456
+
+Options:
+  --no-web               Use terminal attach instead of web UI
+```
+
+#### `claude-sandbox list`
+List all Claude Sandbox containers:
+```bash
+claude-sandbox list
+claude-sandbox ls        # alias
+
+Options:
+  -a, --all              Show all containers (including stopped)
+```
+
+#### `claude-sandbox stop [container-id]`
+Stop containers:
+```bash
+# Interactive selection
+claude-sandbox stop
+
+# Specific container
+claude-sandbox stop abc123def456
+
+# Stop all
+claude-sandbox stop --all
+```
+
+#### `claude-sandbox logs [container-id]`
+View container logs:
+```bash
+claude-sandbox logs
+claude-sandbox logs abc123def456
+
+Options:
+  -f, --follow           Follow log output
+  -n, --tail <lines>     Number of lines to show (default: 50)
+```
+
+#### `claude-sandbox clean`
+Remove stopped containers:
+```bash
+claude-sandbox clean
+claude-sandbox clean --force  # Remove all containers
+```
+
+#### `claude-sandbox config`
+Show current configuration:
+```bash
+claude-sandbox config
 ```
 
 ### Configuration
@@ -209,19 +273,22 @@ When Claude makes a commit:
    - Push branch and create PR
    - Exit
 
-### Asynchronous Operation
+### Working with Multiple Containers
 
-Run multiple instances simultaneously:
+Run multiple Claude instances simultaneously:
 
 ```bash
-# Terminal 1
-claude-sandbox
+# Terminal 1: Start main development
+claude-sandbox start --name main-dev
 
-# Terminal 2
-claude-sandbox --name project-feature
+# Terminal 2: Start feature branch work
+claude-sandbox start --name feature-auth
 
-# Terminal 3
-claude-sandbox --detached --name background-task
+# Terminal 3: List all running containers
+claude-sandbox list
+
+# Terminal 4: Attach to any container
+claude-sandbox attach
 ```
 
 ## Docker Environment

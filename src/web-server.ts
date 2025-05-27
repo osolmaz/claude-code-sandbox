@@ -90,7 +90,7 @@ export class WebUIServer {
           });
 
           stream.on('end', () => {
-            socket.emit('disconnect');
+            socket.emit('container-disconnected');
             this.activeStreams.delete(socket.id);
           });
 

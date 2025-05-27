@@ -116,8 +116,13 @@ function initSocket() {
     });
 
     socket.on('disconnect', () => {
-        updateStatus('error', 'Disconnected');
-        term.writeln('\r\n\x1b[1;31mConnection lost. Click "Reconnect" to retry.\x1b[0m');
+        updateStatus('error', 'Disconnected from server');
+        term.writeln('\r\n\x1b[1;31mServer connection lost. Click "Reconnect" to retry.\x1b[0m');
+    });
+
+    socket.on('container-disconnected', () => {
+        updateStatus('error', 'Container disconnected');
+        term.writeln('\r\n\x1b[1;31mContainer connection lost. Click "Reconnect" to retry.\x1b[0m');
     });
 
     socket.on('error', (error) => {
