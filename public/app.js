@@ -173,7 +173,24 @@ function onIdleDetected() {
             // Trigger file sync
             if (socket && containerId) {
                 console.log('[SYNC] Triggering file sync due to input needed...');
+                console.log('[SYNC] Container ID:', containerId);
+                console.log('[SYNC] Socket connected:', socket.connected);
+                console.log('[SYNC] Socket ID:', socket.id);
+                
+                // Test the socket connection first
+                socket.emit('test-sync', { message: 'testing sync connection' });
+                
+                // Emit the actual event and log it
                 socket.emit('input-needed', { containerId });
+                console.log('[SYNC] Event emitted successfully');
+                
+                // Set a timeout to check if we get a response
+                setTimeout(() => {
+                    console.log('[SYNC] 5 seconds passed, checking if sync completed...');
+                }, 5000);
+                
+            } else {
+                console.log('[SYNC] Cannot trigger sync - socket:', !!socket, 'containerId:', !!containerId);
             }
         }
     }
@@ -442,11 +459,28 @@ function initSocket() {
 
     socket.on('sync-complete', (data) => {
         console.log('[SYNC] Sync completed:', data);
+        console.log('[SYNC] Has changes:', data.hasChanges);
+        console.log('[SYNC] Summary:', data.summary);
+        console.log('[SYNC] Diff data:', data.diffData);
+        
         if (data.hasChanges) {
             updateStatus('connected', `📁 Changes synced: ${data.summary}`);
-            showGitWorkflow(data);
+            updateChangesTab(data);
+            
+            // Add indicator to Changes tab
+            const changesTab = document.getElementById('changes-tab');
+            if (changesTab) {
+                changesTab.classList.add('has-changes');
+                console.log('[SYNC] Added has-changes class to tab');
+            } else {
+                console.error('[SYNC] Changes tab not found!');
+            }
+            
+            // Auto-switch to changes tab if user wants to see
+            // (optional - can be removed if prefer to stay on terminal)
         } else {
             updateStatus('connected', '✨ No changes to sync');
+            clearChangesTab();
         }
     });
 
@@ -454,11 +488,24 @@ function initSocket() {
         console.error('[SYNC] Sync error:', error);
         updateStatus('error', `Sync failed: ${error.message}`);
     });
-
+    
+    // Add general error handler
     socket.on('error', (error) => {
-        console.error('Socket error:', error);
+        console.error('[SOCKET] Socket error:', error);
+    });
+    
+    // Add disconnect handler with debug
+    socket.on('disconnect', (reason) => {
+        console.log('[SOCKET] Disconnected:', reason);
+    });
+
+    // Container error handler (keeping this for backward compatibility)
+    socket.on('container-error', (error) => {
+        console.error('[CONTAINER] Container error:', error);
         updateStatus('error', 'Error: ' + error.message);
-        term.writeln('\r\n\x1b[1;31mError: ' + error.message + '\x1b[0m');
+        if (term && term.writeln) {
+            term.writeln('\r\n\x1b[1;31mError: ' + error.message + '\x1b[0m');
+        }
 
         // If container not found, try to get a new one
         if (error.message && error.message.includes('no such container')) {
@@ -582,264 +629,110 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Git workflow functions
-function showGitWorkflow(syncData) {
-    // Remove any existing git workflow modal
-    const existingModal = document.getElementById('git-workflow-modal');
-    if (existingModal) {
-        existingModal.remove();
+// Tab system functions
+function switchTab(tabName) {
+    // Remove active class from all tabs and content
+    document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    
+    // Add active class to selected tab and content
+    document.getElementById(tabName + '-tab').classList.add('active');
+    document.getElementById(tabName + '-content').classList.add('active');
+    
+    // If switching to changes tab, remove the "has-changes" indicator
+    if (tabName === 'changes') {
+        document.getElementById('changes-tab').classList.remove('has-changes');
     }
+    
+    // Resize terminal if switching back to terminal tab
+    if (tabName === 'terminal' && term && term.fit) {
+        setTimeout(() => term.fit(), 100);
+    }
+}
 
-    // Create modal
-    const modal = document.createElement('div');
-    modal.id = 'git-workflow-modal';
-    modal.innerHTML = `
-        <div class="git-modal-overlay" onclick="closeGitWorkflow()">
-            <div class="git-modal-content" onclick="event.stopPropagation()">
-                <div class="git-modal-header">
-                    <h2>📁 Git Changes Review</h2>
-                    <button onclick="closeGitWorkflow()" class="close-btn">×</button>
-                </div>
-                
-                <div class="git-modal-body">
-                    <div class="changes-summary">
-                        <strong>Changes Summary:</strong> ${syncData.summary}
-                    </div>
-                    
-                    <div class="diff-viewer" id="diff-viewer">
-                        ${formatDiffForDisplay(syncData.diffData)}
-                    </div>
-                    
-                    <div class="commit-section">
-                        <h3>💾 Commit Changes</h3>
-                        <textarea 
-                            id="commit-message" 
-                            placeholder="Enter commit message..."
-                            rows="3"
-                        >Update files from Claude
+// Git workflow functions for tab system
+function updateChangesTab(syncData) {
+    console.log('[UI] updateChangesTab called with:', syncData);
+    
+    const container = document.getElementById('changes-container');
+    const noChanges = document.getElementById('no-changes');
+    
+    if (!container) {
+        console.error('[UI] changes-container not found!');
+        return;
+    }
+    
+    if (!noChanges) {
+        console.error('[UI] no-changes element not found!');
+        return;
+    }
+    
+    // Hide empty state
+    noChanges.style.display = 'none';
+    console.log('[UI] Hidden empty state');
+    
+    // Create changes content
+    container.innerHTML = `
+        <div class="changes-summary">
+            <strong>Changes Summary:</strong> ${syncData.summary}
+        </div>
+        
+        <div class="diff-viewer">
+            ${formatDiffForDisplay(syncData.diffData)}
+        </div>
+        
+        <div class="git-actions">
+            <h3>💾 Commit Changes</h3>
+            <textarea 
+                id="commit-message" 
+                placeholder="Enter commit message..."
+                rows="3"
+            >Update files from Claude
 
 ${syncData.summary}</textarea>
-                        
-                        <div class="commit-actions">
-                            <button onclick="commitChanges('${syncData.containerId}')" class="btn btn-primary">
-                                Commit Changes
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="push-section" id="push-section" style="display: none;">
-                        <h3>🚀 Push to Remote</h3>
-                        <div class="branch-input">
-                            <label for="branch-name">Branch name:</label>
-                            <input type="text" id="branch-name" placeholder="claude-changes" value="claude-changes">
-                        </div>
-                        <div class="push-actions">
-                            <button onclick="pushChanges('${syncData.containerId}')" class="btn btn-success">
-                                Push to Remote
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            
+            <div style="margin-bottom: 15px;">
+                <button onclick="commitChanges('${syncData.containerId}')" class="btn btn-primary" id="commit-btn">
+                    Commit Changes
+                </button>
+            </div>
+        </div>
+        
+        <div class="git-actions" id="push-section" style="display: none;">
+            <h3>🚀 Push to Remote</h3>
+            <div class="branch-input">
+                <label for="branch-name">Branch name:</label>
+                <input type="text" id="branch-name" placeholder="claude-changes" value="claude-changes">
+            </div>
+            <div>
+                <button onclick="pushChanges('${syncData.containerId}')" class="btn btn-success" id="push-btn">
+                    Push to Remote
+                </button>
             </div>
         </div>
     `;
-
-    document.body.appendChild(modal);
     
-    // Add CSS styles if not already present
-    if (!document.getElementById('git-workflow-styles')) {
-        const styles = document.createElement('style');
-        styles.id = 'git-workflow-styles';
-        styles.textContent = `
-            .git-modal-overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.8);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 1000;
-            }
-            
-            .git-modal-content {
-                background: #1e1e1e;
-                border: 1px solid #444;
-                border-radius: 8px;
-                width: 90%;
-                max-width: 800px;
-                max-height: 90vh;
-                overflow-y: auto;
-                color: #fff;
-            }
-            
-            .git-modal-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 20px;
-                border-bottom: 1px solid #444;
-            }
-            
-            .git-modal-header h2 {
-                margin: 0;
-                color: #fff;
-            }
-            
-            .close-btn {
-                background: none;
-                border: none;
-                color: #fff;
-                font-size: 24px;
-                cursor: pointer;
-                padding: 0;
-                width: 30px;
-                height: 30px;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }
-            
-            .close-btn:hover {
-                background: #444;
-                border-radius: 4px;
-            }
-            
-            .git-modal-body {
-                padding: 20px;
-            }
-            
-            .changes-summary {
-                background: #2d2d2d;
-                padding: 15px;
-                border-radius: 6px;
-                margin-bottom: 20px;
-                border-left: 4px solid #4CAF50;
-            }
-            
-            .diff-viewer {
-                background: #0d1117;
-                border: 1px solid #30363d;
-                border-radius: 6px;
-                padding: 15px;
-                margin-bottom: 20px;
-                font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
-                font-size: 13px;
-                line-height: 1.45;
-                overflow-x: auto;
-                max-height: 300px;
-                overflow-y: auto;
-            }
-            
-            .diff-line {
-                padding: 2px 0;
-                white-space: pre;
-            }
-            
-            .diff-line.added {
-                background: rgba(46, 160, 67, 0.15);
-                color: #3fb950;
-            }
-            
-            .diff-line.removed {
-                background: rgba(248, 81, 73, 0.15);
-                color: #f85149;
-            }
-            
-            .diff-line.context {
-                color: #e6edf3;
-            }
-            
-            .diff-line.header {
-                color: #7d8590;
-                font-weight: bold;
-            }
-            
-            .commit-section, .push-section {
-                background: #2d2d2d;
-                padding: 20px;
-                border-radius: 6px;
-                margin-bottom: 15px;
-            }
-            
-            .commit-section h3, .push-section h3 {
-                margin: 0 0 15px 0;
-                color: #fff;
-            }
-            
-            #commit-message {
-                width: 100%;
-                background: #0d1117;
-                border: 1px solid #30363d;
-                border-radius: 6px;
-                padding: 12px;
-                color: #e6edf3;
-                font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
-                font-size: 14px;
-                resize: vertical;
-                margin-bottom: 15px;
-            }
-            
-            .branch-input {
-                margin-bottom: 15px;
-            }
-            
-            .branch-input label {
-                display: block;
-                margin-bottom: 5px;
-                color: #e6edf3;
-            }
-            
-            #branch-name {
-                width: 200px;
-                background: #0d1117;
-                border: 1px solid #30363d;
-                border-radius: 6px;
-                padding: 8px 12px;
-                color: #e6edf3;
-                font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
-            }
-            
-            .btn {
-                background: #238636;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 14px;
-                font-weight: 500;
-            }
-            
-            .btn:hover {
-                background: #2ea043;
-            }
-            
-            .btn:disabled {
-                background: #484f58;
-                cursor: not-allowed;
-            }
-            
-            .btn-primary {
-                background: #1f6feb;
-            }
-            
-            .btn-primary:hover {
-                background: #388bfd;
-            }
-            
-            .btn-success {
-                background: #238636;
-            }
-            
-            .btn-success:hover {
-                background: #2ea043;
-            }
-        `;
-        document.head.appendChild(styles);
-    }
+    // Store sync data for later use
+    window.currentSyncData = syncData;
+}
+
+function clearChangesTab() {
+    const container = document.getElementById('changes-container');
+    const noChanges = document.getElementById('no-changes');
+    
+    // Show empty state
+    noChanges.style.display = 'block';
+    
+    // Clear changes content but keep the empty state
+    container.innerHTML = `
+        <div class="empty-state" id="no-changes">
+            <h3>No changes detected</h3>
+            <p>Claude hasn't made any changes yet. Changes will appear here automatically when Claude modifies files.</p>
+        </div>
+    `;
+    
+    // Remove changes indicator
+    document.getElementById('changes-tab').classList.remove('has-changes');
 }
 
 function formatDiffForDisplay(diffData) {
@@ -897,13 +790,6 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-function closeGitWorkflow() {
-    const modal = document.getElementById('git-workflow-modal');
-    if (modal) {
-        modal.remove();
-    }
-}
-
 function commitChanges(containerId) {
     const commitMessage = document.getElementById('commit-message').value.trim();
     if (!commitMessage) {
@@ -911,7 +797,7 @@ function commitChanges(containerId) {
         return;
     }
     
-    const btn = event.target;
+    const btn = document.getElementById('commit-btn');
     btn.disabled = true;
     btn.textContent = 'Committing...';
     
@@ -939,7 +825,7 @@ function commitChanges(containerId) {
 function pushChanges(containerId) {
     const branchName = document.getElementById('branch-name').value.trim() || 'claude-changes';
     
-    const btn = event.target;
+    const btn = document.getElementById('push-btn');
     btn.disabled = true;
     btn.textContent = 'Pushing...';
     
@@ -947,13 +833,14 @@ function pushChanges(containerId) {
     
     // Handle push result
     socket.once('push-success', () => {
-        btn.textContent = '✓ Pushed';
+        btn.textContent = '✓ Pushed to GitHub';
         btn.style.background = '#238636';
-        updateStatus('connected', `✓ Changes pushed to ${branchName}`);
+        updateStatus('connected', `✓ Changes pushed to remote ${branchName}`);
         
+        // Clear the changes tab after successful push
         setTimeout(() => {
-            closeGitWorkflow();
-        }, 2000);
+            clearChangesTab();
+        }, 3000);
     });
     
     socket.once('push-error', (error) => {

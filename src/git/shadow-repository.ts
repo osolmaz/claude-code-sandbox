@@ -91,6 +91,22 @@ export class ShadowRepository {
         await execAsync(`git checkout -b ${this.options.claudeBranch}`, { cwd: this.shadowPath });
       }
       
+      // Configure remote to point to the actual GitHub remote, not local repo
+      try {
+        const { stdout: remoteUrl } = await execAsync('git remote get-url origin', { 
+          cwd: this.options.originalRepo 
+        });
+        const actualRemote = remoteUrl.trim();
+        
+        if (actualRemote && !actualRemote.startsWith('/') && !actualRemote.startsWith('file://')) {
+          // Set the remote to the actual GitHub/remote URL
+          await execAsync(`git remote set-url origin "${actualRemote}"`, { cwd: this.shadowPath });
+          console.log(chalk.blue(`  ✓ Configured remote: ${actualRemote}`));
+        }
+      } catch (remoteError) {
+        console.log(chalk.gray('  (Could not configure remote URL, using local)'));
+      }
+      
       console.log(chalk.green('✓ Shadow repository created'));
       this.initialized = true;
     } catch (error) {
@@ -172,8 +188,30 @@ export class ShadowRepository {
       // Try to install rsync if not available
       try {
         console.log(chalk.yellow('  Installing rsync in container...'));
-        await execAsync(`docker exec ${containerId} apk add --no-cache rsync`);
-        return true;
+        
+        // Try different package managers
+        const installCommands = [
+          'apk add --no-cache rsync',           // Alpine
+          'apt-get update && apt-get install -y rsync',  // Ubuntu/Debian
+          'yum install -y rsync',               // CentOS/RHEL
+          'dnf install -y rsync'                // Fedora
+        ];
+        
+        for (const cmd of installCommands) {
+          try {
+            await execAsync(`docker exec ${containerId} sh -c "${cmd}"`);
+            // Test if rsync is now available
+            await execAsync(`docker exec ${containerId} which rsync`);
+            console.log(chalk.green('  ✓ rsync installed successfully'));
+            return true;
+          } catch (cmdError) {
+            // Continue to next command
+            continue;
+          }
+        }
+        
+        console.log(chalk.gray('  (Could not install rsync with any package manager)'));
+        return false;
       } catch (installError) {
         console.log(chalk.gray('  (Could not install rsync, using docker cp)'));
         return false;
@@ -207,37 +245,64 @@ export class ShadowRepository {
   private async syncWithDockerCp(containerId: string, containerPath: string): Promise<void> {
     console.log(chalk.yellow('⚠️  Using docker cp (rsync not available in container)'));
     
-    // Save the git directory
-    const gitBackupPath = path.join(this.basePath, '.git-backup');
-    const gitPath = path.join(this.shadowPath, '.git');
+    // Create a temp directory for staging the copy
+    const tempCopyPath = path.join(this.basePath, 'temp-copy');
     
-    if (await fs.pathExists(gitPath)) {
-      await fs.move(gitPath, gitBackupPath, { overwrite: true });
-    }
-    
-    // Direct copy - less efficient but works everywhere
-    await execAsync(`docker cp ${containerId}:${containerPath}/. ${this.shadowPath}/`);
-    
-    // Fix ownership of copied files to current user
     try {
-      const currentUser = process.env.USER || process.env.USERNAME || 'claude';
-      await execAsync(`chown -R ${currentUser}:${currentUser} ${this.shadowPath}`);
-    } catch (error) {
-      // Ignore chown errors (might not have permission or be on different OS)
-      console.log(chalk.gray('  (Could not fix file ownership, continuing...)'));
-    }
-    
-    // Restore git directory
-    if (await fs.pathExists(gitBackupPath)) {
-      await fs.move(gitBackupPath, gitPath, { overwrite: true });
-    }
-    
-    // Remove unwanted directories after copy (except .git which we preserved)
-    const excludeDirs = ['node_modules', '.next', 'dist', 'build'];
-    for (const dir of excludeDirs) {
-      const dirPath = path.join(this.shadowPath, dir);
-      if (await fs.pathExists(dirPath)) {
-        await fs.remove(dirPath);
+      // Remove temp directory if it exists
+      if (await fs.pathExists(tempCopyPath)) {
+        await fs.remove(tempCopyPath);
+      }
+      
+      // Create temp directory
+      await fs.ensureDir(tempCopyPath);
+      
+      // Copy files to temp directory first (to avoid corrupting shadow repo)
+      await execAsync(`docker cp ${containerId}:${containerPath}/. ${tempCopyPath}/`);
+      
+      // Now selectively copy files to shadow repo, excluding git and unwanted dirs
+      const excludeDirs = ['.git', 'node_modules', '.next', 'dist', 'build', '__pycache__', '.venv'];
+      const excludePatterns = excludeDirs.map(dir => `--exclude=${dir}`).join(' ');
+      
+      // Use rsync on host to copy files (excluding unwanted directories)
+      try {
+        await execAsync(`rsync -av ${excludePatterns} ${tempCopyPath}/ ${this.shadowPath}/`);
+      } catch (rsyncError) {
+        // Fallback to cp if rsync not available on host
+        console.log(chalk.gray('  (rsync not available on host, using cp)'));
+        
+        // Manual copy excluding directories
+        const { stdout: fileList } = await execAsync(`find ${tempCopyPath} -type f`);
+        const files = fileList.trim().split('\n').filter(f => f.trim());
+        
+        for (const file of files) {
+          const relativePath = path.relative(tempCopyPath, file);
+          
+          // Skip excluded directories
+          if (excludeDirs.some(dir => relativePath.startsWith(dir + '/') || relativePath === dir)) {
+            continue;
+          }
+          
+          const targetPath = path.join(this.shadowPath, relativePath);
+          const targetDir = path.dirname(targetPath);
+          
+          await fs.ensureDir(targetDir);
+          await fs.copy(file, targetPath);
+        }
+      }
+      
+      // Fix ownership of copied files
+      try {
+        const currentUser = process.env.USER || process.env.USERNAME || 'claude';
+        await execAsync(`chown -R ${currentUser}:${currentUser} ${this.shadowPath}`);
+      } catch (error) {
+        console.log(chalk.gray('  (Could not fix file ownership, continuing...)'));
+      }
+      
+    } finally {
+      // Clean up temp directory
+      if (await fs.pathExists(tempCopyPath)) {
+        await fs.remove(tempCopyPath);
       }
     }
   }

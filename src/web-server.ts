@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
+import * as fs from 'fs-extra';
 import Docker from 'dockerode';
 import chalk from 'chalk';
 import { exec } from 'child_process';
@@ -26,6 +27,7 @@ export class WebUIServer {
   private sessions: Map<string, SessionInfo> = new Map(); // container -> session mapping
   private port: number = 3456;
   private shadowRepos: Map<string, ShadowRepository> = new Map(); // container -> shadow repo
+  private syncInProgress: Set<string> = new Set(); // Track containers currently syncing
   private originalRepo: string = '';
   private currentBranch: string = 'main';
 
@@ -234,8 +236,23 @@ export class WebUIServer {
         }
       });
 
+      // Test handler to verify socket connectivity
+      socket.on('test-sync', (data) => {
+        console.log(chalk.yellow(`[TEST] Received test-sync event:`, data));
+      });
+
       socket.on('input-needed', async (data) => {
         const { containerId } = data;
+        console.log(chalk.cyan(`[DEBUG] Received input-needed event for container: ${containerId}`));
+        console.log(chalk.cyan(`[DEBUG] Data received:`, data));
+        
+        // Prevent multiple concurrent syncs for the same container
+        if (this.syncInProgress.has(containerId)) {
+          console.log(chalk.gray('  Sync already in progress for this container, skipping...'));
+          return;
+        }
+        
+        this.syncInProgress.add(containerId);
         console.log(chalk.blue('🔔 Input needed detected, triggering sync...'));
         
         try {
@@ -253,6 +270,14 @@ export class WebUIServer {
           const shadowRepo = this.shadowRepos.get(containerId)!;
           await shadowRepo.syncFromContainer(containerId);
           
+          // Check if shadow repo actually has git initialized
+          const shadowPath = shadowRepo.getPath();
+          const gitPath = path.join(shadowPath, '.git');
+          
+          if (!await fs.pathExists(gitPath)) {
+            throw new Error('Shadow repository .git directory missing - sync may have failed');
+          }
+          
           // Get changes summary and diff data
           const changes = await shadowRepo.getChanges();
           let diffData = null;
@@ -260,11 +285,11 @@ export class WebUIServer {
           if (changes.hasChanges) {
             // Get detailed file status and diffs
             const { stdout: statusOutput } = await execAsync('git status --porcelain', { 
-              cwd: shadowRepo.getPath() 
+              cwd: shadowPath 
             });
             
             const { stdout: diffOutput } = await execAsync('git diff HEAD', { 
-              cwd: shadowRepo.getPath(),
+              cwd: shadowPath,
               maxBuffer: 1024 * 1024 // 1MB limit
             });
             
@@ -283,18 +308,27 @@ export class WebUIServer {
             };
           }
           
-          // Send summary back to client
-          socket.emit('sync-complete', {
+          console.log(chalk.green('✅ Sync completed successfully'));
+          
+          const syncCompleteData = {
             hasChanges: changes.hasChanges,
             summary: changes.summary,
-            shadowPath: shadowRepo.getPath(),
+            shadowPath: shadowPath,
             diffData: diffData,
             containerId: containerId
-          });
+          };
+          
+          console.log(chalk.cyan(`[DEBUG] Sending sync-complete event:`, syncCompleteData));
+          
+          // Send summary back to client
+          socket.emit('sync-complete', syncCompleteData);
           
         } catch (error: any) {
           console.error(chalk.red('Sync failed:'), error);
           socket.emit('sync-error', { message: error.message });
+        } finally {
+          // Always remove from sync progress
+          this.syncInProgress.delete(containerId);
         }
       });
 
