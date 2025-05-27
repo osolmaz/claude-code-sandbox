@@ -309,6 +309,9 @@ function initTerminal() {
     term.writeln('\x1b[1;32mWelcome to Claude Code Sandbox Terminal\x1b[0m');
     term.writeln('\x1b[90mConnecting to container...\x1b[0m');
     term.writeln('');
+    
+    // Auto-focus the terminal
+    term.focus();
 }
 
 // Initialize Socket.IO connection
@@ -355,6 +358,11 @@ function initSocket() {
 
         // Start idle detection
         resetIdleTimer();
+        
+        // Focus terminal when attached
+        if (term) {
+            term.focus();
+        }
     });
 
     socket.on('output', (data) => {
