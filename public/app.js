@@ -195,15 +195,16 @@ function clearTerminal() {
 
 function reconnect() {
     if (socket && containerId) {
-        // Clear terminal
-        term.clear();
-        term.writeln('\x1b[90mReconnecting...\x1b[0m');
+        // Don't clear terminal - preserve existing content
+        term.writeln('\r\n\x1b[90mReconnecting...\x1b[0m');
         
-        // Disconnect and reconnect
-        socket.disconnect();
-        setTimeout(() => {
-            socket.connect();
-        }, 100);
+        // Just emit attach again without disconnecting
+        // This will reattach to the existing session
+        socket.emit('attach', { 
+            containerId: containerId,
+            cols: term.cols,
+            rows: term.rows
+        });
     }
 }
 

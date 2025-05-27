@@ -7,10 +7,8 @@ import chalk from 'chalk';
 
 interface SessionInfo {
   containerId: string;
-  exec?: any;
   stream?: any;
-  connectedSockets: Set<string>;  // Track connected sockets
-  outputHistory?: Buffer[];  // Store output history for replay
+  connectedSockets: Set<string>;
 }
 
 export class WebUIServer {
@@ -18,7 +16,7 @@ export class WebUIServer {
   private httpServer: any;
   private io: Server;
   private docker: Docker;
-  private sessions: Map<string, SessionInfo> = new Map(); // container -> session mapping
+  private sessions: Map<string, SessionInfo> = new Map();
   private port: number = 3456;
 
   constructor(docker: Docker) {
@@ -73,67 +71,33 @@ export class WebUIServer {
           let session = this.sessions.get(containerId);
           
           if (!session || !session.stream) {
-            // No existing session, create a new one
-            console.log(chalk.blue('Creating new Claude session...'));
-            const exec = await container.exec({
-              AttachStdin: true,
-              AttachStdout: true,
-              AttachStderr: true,
-              Tty: true,
-              Cmd: ['claude', '--dangerously-skip-permissions'],
-              WorkingDir: '/workspace',
-              User: 'claude',
-              Env: [
-                'TERM=xterm-256color',
-                'COLORTERM=truecolor'
-              ]
-            });
-
-            const stream = await exec.start({
-              hijack: true,
-              stdin: true
+            // Attach to the container's main process
+            console.log(chalk.blue('Attaching to container...'));
+            
+            const stream = await container.attach({
+              stream: true,
+              stdin: true,
+              stdout: true,
+              stderr: true,
+              hijack: true
             });
             
             session = { 
               containerId, 
-              exec, 
               stream,
-              connectedSockets: new Set([socket.id]),
-              outputHistory: []
+              connectedSockets: new Set([socket.id])
             };
             this.sessions.set(containerId, session);
             
-            // Set up stream handlers that broadcast to all connected sockets
+            // Set up stream handlers
             stream.on('data', (chunk: Buffer) => {
-              // Process and broadcast to all connected sockets for this session
-              let dataToSend: Buffer;
-              
-              if (chunk.length > 8) {
-                const firstByte = chunk[0];
-                if (firstByte >= 1 && firstByte <= 3) {
-                  dataToSend = chunk.slice(8);
-                } else {
-                  dataToSend = chunk;
-                }
-              } else {
-                dataToSend = chunk;
-              }
-              
-              if (dataToSend.length > 0) {
-                // Store in history (limit to last 100KB)
-                if (session!.outputHistory) {
-                  session!.outputHistory.push(Buffer.from(dataToSend));
-                  const totalSize = session!.outputHistory.reduce((sum, buf) => sum + buf.length, 0);
-                  while (totalSize > 100000 && session!.outputHistory.length > 1) {
-                    session!.outputHistory.shift();
-                  }
-                }
-                
-                // Broadcast to all connected sockets for this container
+              // Docker attach streams don't have the same header format as exec
+              // Just forward the data as-is
+              if (chunk.length > 0) {
                 for (const socketId of session!.connectedSockets) {
                   const connectedSocket = this.io.sockets.sockets.get(socketId);
                   if (connectedSocket) {
-                    connectedSocket.emit('output', new Uint8Array(dataToSend));
+                    connectedSocket.emit('output', new Uint8Array(chunk));
                   }
                 }
               }
@@ -141,7 +105,6 @@ export class WebUIServer {
             
             stream.on('error', (err: Error) => {
               console.error(chalk.red('Stream error:'), err);
-              // Notify all connected sockets
               for (const socketId of session!.connectedSockets) {
                 const connectedSocket = this.io.sockets.sockets.get(socketId);
                 if (connectedSocket) {
@@ -151,45 +114,33 @@ export class WebUIServer {
             });
             
             stream.on('end', () => {
-              // Notify all connected sockets
               for (const socketId of session!.connectedSockets) {
                 const connectedSocket = this.io.sockets.sockets.get(socketId);
                 if (connectedSocket) {
                   connectedSocket.emit('container-disconnected');
                 }
               }
-              // Clean up session
               this.sessions.delete(containerId);
             });
             
-            console.log(chalk.green('New Claude session started'));
+            console.log(chalk.green('Attached to container'));
           } else {
             // Add this socket to the existing session
-            console.log(chalk.blue('Reconnecting to existing Claude session'));
+            console.log(chalk.blue('Reconnecting to existing session'));
             session.connectedSockets.add(socket.id);
-            
-            // Replay output history to the reconnecting client
-            if (session.outputHistory && session.outputHistory.length > 0) {
-              console.log(chalk.blue(`Replaying ${session.outputHistory.length} output chunks`));
-              // Send a clear screen first
-              socket.emit('output', new Uint8Array(Buffer.from('\x1b[2J\x1b[H')));
-              // Then replay the history
-              for (const chunk of session.outputHistory) {
-                socket.emit('output', new Uint8Array(chunk));
-              }
-            }
           }
 
           // Confirm attachment
           socket.emit('attached', { containerId });
           
-          // Send initial resize after a small delay
-          if (session.exec && data.cols && data.rows) {
-            setTimeout(async () => {
-              try {
-                await session.exec.resize({ w: data.cols, h: data.rows });
-              } catch (e) {
-                // Ignore resize errors
+          // Container attach doesn't support resize like exec does
+          // But we can try to send a resize sequence through stdin
+          if (data.cols && data.rows) {
+            setTimeout(() => {
+              // Send terminal resize escape sequence
+              const resizeSeq = `\x1b[8;${data.rows};${data.cols}t`;
+              if (session && session.stream) {
+                session.stream.write(resizeSeq);
               }
             }, 100);
           }
@@ -205,12 +156,10 @@ export class WebUIServer {
         
         // Find which session this socket belongs to
         for (const [, session] of this.sessions) {
-          if (session.connectedSockets.has(socket.id) && session.exec) {
-            try {
-              await session.exec.resize({ w: cols, h: rows });
-            } catch (error) {
-              console.error(chalk.yellow('Failed to resize terminal:'), error);
-            }
+          if (session.connectedSockets.has(socket.id) && session.stream) {
+            // Send resize escape sequence
+            const resizeSeq = `\x1b[8;${rows};${cols}t`;
+            session.stream.write(resizeSeq);
             break;
           }
         }
@@ -229,7 +178,7 @@ export class WebUIServer {
       socket.on('disconnect', () => {
         console.log(chalk.yellow('Client disconnected from web UI'));
         
-        // Remove socket from all sessions
+        // Remove socket from all sessions but don't close the stream
         for (const [, session] of this.sessions) {
           session.connectedSockets.delete(socket.id);
         }
@@ -247,7 +196,6 @@ export class WebUIServer {
 
       this.httpServer.on('error', (err: any) => {
         if (err.code === 'EADDRINUSE') {
-          // Try next port
           this.port++;
           this.httpServer.listen(this.port, () => {
             const url = `http://localhost:${this.port}`;
