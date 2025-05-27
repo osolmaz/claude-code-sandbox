@@ -22,6 +22,7 @@ export interface SandboxConfig {
   maxThinkingTokens?: number;
   bashTimeout?: number;
   webUI?: boolean;
+  includeUntracked?: boolean;
 }
 
 export interface Credentials {

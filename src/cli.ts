@@ -55,6 +55,7 @@ program
     const config = await loadConfig("./claude-sandbox.config.json");
     config.webUI = true; // Always use web UI by default
     config.detached = true; // Web UI requires detached mode
+    config.includeUntracked = false; // Don't include untracked files by default
     
     const sandbox = new ClaudeSandbox(config);
     await sandbox.run();
@@ -69,6 +70,7 @@ program
   .option("--no-web", "Disable web UI (use terminal attach)")
   .option("--no-push", "Disable automatic branch pushing")
   .option("--no-pr", "Disable automatic PR creation")
+  .option("--include-untracked", "Include untracked files when copying to container")
   .action(async (options) => {
     console.log(chalk.blue("🚀 Starting new Claude Sandbox container..."));
     
@@ -78,6 +80,7 @@ program
     config.containerPrefix = options.name || config.containerPrefix;
     config.autoPush = options.push !== false;
     config.autoCreatePR = options.pr !== false;
+    config.includeUntracked = options.includeUntracked || false;
     
     const sandbox = new ClaudeSandbox(config);
     await sandbox.run();

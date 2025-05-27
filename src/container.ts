@@ -784,17 +784,20 @@ exec /bin/bash`;
         .split("\n")
         .filter((f: string) => f);
 
-      // Get list of untracked files that aren't ignored
-      const untrackedFiles = execSync(
-        "git ls-files --others --exclude-standard",
-        {
-          cwd: workDir,
-          encoding: "utf-8",
-        },
-      )
-        .trim()
-        .split("\n")
-        .filter((f: string) => f);
+      // Get list of untracked files that aren't ignored (only if includeUntracked is true)
+      let untrackedFiles: string[] = [];
+      if (this.config.includeUntracked) {
+        untrackedFiles = execSync(
+          "git ls-files --others --exclude-standard",
+          {
+            cwd: workDir,
+            encoding: "utf-8",
+          },
+        )
+          .trim()
+          .split("\n")
+          .filter((f: string) => f);
+      }
 
       // Combine all files
       const allFiles = [...trackedFiles, ...untrackedFiles];
