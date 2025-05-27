@@ -112,6 +112,17 @@
             background-color: #3c3c3c;
         }
 
+        .controls label {
+            color: #cccccc;
+            font-size: 0.875rem;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .controls input[type="checkbox"] {
+            cursor: pointer;
+        }
+
         .info {
             background-color: #364152;
             border: 1px solid #4c5c74;
@@ -164,6 +175,9 @@
     </style>
 </head>
 <body>
+    <!-- Hidden audio element for fallback sound -->
+    <audio id="notification-sound" style="display: none;">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwr2hYmbe9FmXQY1Waj48noCAiaMr+xuQQEfcd/04FkGEly1+O18CgEiirLyalQDG3DY9ONfCBJZtPfvfgwCIYiw8m1aDBtu1fTiYwsVXLT47nkJAiKHrvJvXg0abtX04mMLFVy0+O55CQIih67yb14NGm7V9OJjCxVctPjueQkCIoeu8m9eDRpu1fTiYwsVXLT47nkJAiKHrvJvXg0abtX04mMLFVy0+O55CQIih67yb14NGm7V9OJjCxVctPjueQkCIoeu8m9eDRpu1fTiYwsVXLT47nkJAiKHrvJvXg0abtX04mMLFVy0+O55CQIih67yb14NGm7V9OJjCxVctPjueQkCIoeu8m9eDRpu1fTiYwsVXLT47nkJAiKHrvJvXg0abtX04mMLFVy0+O55CQIih67yb14NGm7V9OJjCxVctPjueQkCIoeu8m9eDRpu1fTiYwsVXLT47nkJAiKHrvJvXg0abtX04mMLFVy0+O55CQIih67yb14NGm7V9OJjCxVctPjueQkCIoeu8m9eDRpu1fTiYwsVXLT47nkJAiKHrvJvXg0abtX04mMLFVy0+O55CQIih67yb14NGgA=" preload="auto"></audio>
     <div class="header">
         <h1>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -191,6 +205,10 @@
         <button onclick="clearTerminal()">Clear</button>
         <button onclick="reconnect()">Reconnect</button>
         <button onclick="copySelection()">Copy Selection</button>
+        <label style="margin-left: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" id="soundEnabled" checked>
+            <span>Sound notifications</span>
+        </label>
         <span style="margin-left: auto; color: #888;">
             Ctrl+C: Interrupt | Ctrl+D: Exit | Ctrl+L: Clear
         </span>
