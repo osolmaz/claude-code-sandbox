@@ -17,6 +17,7 @@ The tests create a temporary git repository, start a claude-sandbox instance, pe
 
 - **`sync-test-framework.js`** - Main testing framework that manages sandbox lifecycle
 - **`dummy-repo/`** - Template files for creating test repositories
+- **`repo-to-container-sync-test.js`** - Verifies one-to-one sync from repo to container
 - **`core-functionality-test.js`** - Essential functionality tests (recommended)
 - **`simple-deletion-test.js`** - Focused test for deletion tracking
 - **`test-suite.js`** - Comprehensive test suite with all scenarios
@@ -24,11 +25,12 @@ The tests create a temporary git repository, start a claude-sandbox instance, pe
 
 ### Test Categories
 
-1. **File Addition** - Creating new files and verifying sync
-2. **File Modification** - Modifying existing files and tracking changes
-3. **File Deletion** - Deleting files and ensuring proper removal
-4. **Directory Operations** - Creating nested directories and files
-5. **Web UI Notifications** - Verifying real-time sync events
+1. **Repository to Container Sync** - Verifying one-to-one sync from local repo to container
+2. **File Addition** - Creating new files and verifying sync
+3. **File Modification** - Modifying existing files and tracking changes
+4. **File Deletion** - Deleting files and ensuring proper removal
+5. **Directory Operations** - Creating nested directories and files
+6. **Web UI Notifications** - Verifying real-time sync events
 
 ## Running Tests
 
@@ -40,6 +42,9 @@ node core-functionality-test.js
 
 ### Individual Tests
 ```bash
+# Test repository to container sync
+node repo-to-container-sync-test.js
+
 # Test deletion functionality specifically
 node simple-deletion-test.js
 
@@ -77,6 +82,13 @@ node test-suite.js
    - Removes containers and temporary files
 
 ## Key Features Tested
+
+### Repository to Container Sync
+- ✅ One-to-one file mapping from test repo to container
+- ✅ No extra files in container (only test repo files)
+- ✅ File content integrity verification
+- ✅ Git repository properly initialized
+- ✅ Correct branch creation
 
 ### File Synchronization
 - ✅ New file creation and content sync

@@ -223,6 +223,44 @@ class SyncTestFramework {
     }
   }
 
+  async getContainerFileContent(filePath) {
+    try {
+      const { stdout } = await execAsync(`docker exec ${this.containerId} cat /workspace/${filePath}`);
+      return stdout;
+    } catch (error) {
+      throw new Error(`Failed to read container file ${filePath}: ${error.message}`);
+    }
+  }
+
+  async containerFileExists(filePath) {
+    try {
+      await execAsync(`docker exec ${this.containerId} test -f /workspace/${filePath}`);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async listContainerFiles(directory = '') {
+    try {
+      const containerPath = directory ? `/workspace/${directory}` : '/workspace';
+      const { stdout } = await execAsync(`docker exec ${this.containerId} find ${containerPath} -type f -not -path "*/.*" | sed 's|^/workspace/||' | sort`);
+      return stdout.trim().split('\n').filter(f => f);
+    } catch (error) {
+      throw new Error(`Failed to list container files: ${error.message}`);
+    }
+  }
+
+  async listRepoFiles(directory = '') {
+    try {
+      const repoPath = directory ? path.join(this.testRepo, directory) : this.testRepo;
+      const { stdout } = await execAsync(`find ${repoPath} -type f -not -path "*/.*" | sed 's|^${this.testRepo}/||' | sort`);
+      return stdout.trim().split('\n').filter(f => f);
+    } catch (error) {
+      throw new Error(`Failed to list repo files: ${error.message}`);
+    }
+  }
+
   async cleanup() {
     console.log('🧹 Cleaning up test environment...');
     

@@ -31,9 +31,19 @@ echo "✅ Dependencies OK"
 echo "🧹 Cleaning up existing containers..."
 npx claude-sandbox purge -y || echo "No containers to clean up"
 
+# Run repository to container sync test
+echo "🧪 Running repository to container sync test..."
+cd "$(dirname "$0")"
+
+if node repo-to-container-sync-test.js; then
+    echo "✅ Repository to container sync test passed"
+else
+    echo "❌ Repository to container sync test failed"
+    exit 1
+fi
+
 # Run core functionality tests
 echo "🧪 Running core functionality tests..."
-cd "$(dirname "$0")"
 
 if node core-functionality-test.js; then
     echo "✅ Core functionality tests passed"
@@ -49,8 +59,9 @@ npx claude-sandbox purge -y || echo "No containers to clean up"
 echo "🎉 All tests completed successfully!"
 echo ""
 echo "📝 Available tests:"
-echo "  - node core-functionality-test.js  (Core file sync functionality)"
-echo "  - node simple-deletion-test.js     (Focused deletion test)"
-echo "  - node test-suite.js               (Full comprehensive test suite)"
+echo "  - node repo-to-container-sync-test.js  (Verify one-to-one repo sync)"
+echo "  - node core-functionality-test.js      (Core file sync functionality)"
+echo "  - node simple-deletion-test.js         (Focused deletion test)"
+echo "  - node test-suite.js                   (Full comprehensive test suite)"
 echo ""
 echo "✅ File synchronization functionality is working correctly!"

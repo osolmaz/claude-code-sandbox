@@ -12,6 +12,35 @@ async function runCoreTests() {
   try {
     await framework.setup();
     
+    // Test 0: Initial Repository Sync
+    console.log('\n🧪 Test 0: Initial Repository to Container Sync');
+    
+    // Verify that repository files are properly synced to container
+    const repoFiles = await framework.listRepoFiles();
+    const containerFiles = await framework.listContainerFiles();
+    
+    // Check that key files exist in container
+    const expectedFiles = ['README.md', 'package.json', 'src/main.js', 'src/utils.js'];
+    for (const file of expectedFiles) {
+      const exists = await framework.containerFileExists(file);
+      if (!exists) {
+        throw new Error(`Expected file ${file} not found in container`);
+      }
+      
+      // Verify content matches
+      const repoContent = await require('fs').promises.readFile(
+        require('path').join(framework.testRepo, file), 'utf8'
+      );
+      const containerContent = await framework.getContainerFileContent(file);
+      
+      if (repoContent.trim() !== containerContent.trim()) {
+        throw new Error(`Content mismatch for ${file}`);
+      }
+    }
+    
+    console.log('✅ Initial repository sync test passed');
+    tests.push({ name: 'Initial Repository Sync', passed: true });
+    
     // Test 1: File Addition
     console.log('\n🧪 Test 1: File Addition');
     await framework.addFile('addition-test.txt', 'New file content');
