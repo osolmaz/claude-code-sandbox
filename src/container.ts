@@ -49,6 +49,9 @@ export class ContainerManager {
     await new Promise((resolve) => setTimeout(resolve, 500));
     console.log(chalk.green("✓ Container ready"));
 
+    // Run setup commands
+    await this.runSetupCommands(container);
+
     return container.id;
   }
 
@@ -579,73 +582,8 @@ exec /bin/bash`;
 
       console.log(chalk.green("✓ Container setup completed"));
 
-      // Execute custom setup commands if provided
-      if (this.config.setupCommands && this.config.setupCommands.length > 0) {
-        console.log(chalk.blue("• Running custom setup commands..."));
-        console.log(
-          chalk.blue(
-            `  Total commands to run: ${this.config.setupCommands.length}`,
-          ),
-        );
-
-        for (let i = 0; i < this.config.setupCommands.length; i++) {
-          const command = this.config.setupCommands[i];
-          console.log(
-            chalk.yellow(
-              `\n[${i + 1}/${this.config.setupCommands.length}] Running command:`,
-            ),
-          );
-          console.log(chalk.white(`  ${command}`));
-
-          const cmdExec = await container.exec({
-            Cmd: ["/bin/bash", "-c", command],
-            AttachStdout: true,
-            AttachStderr: true,
-            WorkingDir: "/workspace",
-            User: "claude",
-          });
-
-          const cmdStream = await cmdExec.start({});
-
-          // Wait for command to complete
-          await new Promise<void>((resolve, reject) => {
-            let hasError = false;
-
-            cmdStream.on("data", (chunk) => {
-              process.stdout.write("  > " + chunk.toString());
-            });
-
-            cmdStream.on("end", async () => {
-              // Check exit code
-              try {
-                const info = await cmdExec.inspect();
-                if (info.ExitCode !== 0) {
-                  console.error(
-                    chalk.red(
-                      `✗ Command failed with exit code ${info.ExitCode}`,
-                    ),
-                  );
-                  hasError = true;
-                } else {
-                  console.log(chalk.green(`✓ Command completed successfully`));
-                }
-              } catch (e) {
-                // Ignore inspection errors
-              }
-
-              if (hasError && this.config.setupCommands?.includes("set -e")) {
-                reject(new Error(`Setup command failed: ${command}`));
-              } else {
-                resolve();
-              }
-            });
-
-            cmdStream.on("error", reject);
-          });
-        }
-
-        console.log(chalk.green("✓ All setup commands completed"));
-      }
+      // Execute setup commands
+      await this.runSetupCommands(container);
     } catch (error) {
       console.error(chalk.red("✗ Setup failed:"), error);
       throw error;
@@ -1146,6 +1084,76 @@ exec /bin/bash`;
         error,
       );
       // Don't throw - this is not critical for container operation
+    }
+  }
+
+  private async runSetupCommands(container: any): Promise<void> {
+    // Execute custom setup commands if provided
+    if (this.config.setupCommands && this.config.setupCommands.length > 0) {
+      console.log(chalk.blue("• Running custom setup commands..."));
+      console.log(
+        chalk.blue(
+          `  Total commands to run: ${this.config.setupCommands.length}`,
+        ),
+      );
+
+      for (let i = 0; i < this.config.setupCommands.length; i++) {
+        const command = this.config.setupCommands[i];
+        console.log(
+          chalk.yellow(
+            `\n[${i + 1}/${this.config.setupCommands.length}] Running command:`,
+          ),
+        );
+        console.log(chalk.white(`  ${command}`));
+
+        const cmdExec = await container.exec({
+          Cmd: ["/bin/bash", "-c", command],
+          AttachStdout: true,
+          AttachStderr: true,
+          WorkingDir: "/workspace",
+          User: "claude",
+        });
+
+        const cmdStream = await cmdExec.start({});
+
+        // Wait for command to complete
+        await new Promise<void>((resolve, reject) => {
+          let hasError = false;
+
+          cmdStream.on("data", (chunk: any) => {
+            process.stdout.write("  > " + chunk.toString());
+          });
+
+          cmdStream.on("end", async () => {
+            // Check exit code
+            try {
+              const info = await cmdExec.inspect();
+              if (info.ExitCode !== 0) {
+                console.error(
+                  chalk.red(
+                    `✗ Command failed with exit code ${info.ExitCode}`,
+                  ),
+                );
+                hasError = true;
+              } else {
+                console.log(chalk.green(`✓ Command completed successfully`));
+              }
+            } catch (e) {
+              // Ignore inspection errors
+            }
+
+            if (hasError && this.config.setupCommands?.includes("set -e")) {
+              reject(new Error(`Setup command failed: ${command}`));
+            } else {
+              resolve();
+            }
+          });
+
+          cmdStream.on("error", reject);
+        });
+      }
+
+      console.log(chalk.green("✓ All setup commands completed"));
     }
   }
 
