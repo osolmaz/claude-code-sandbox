@@ -476,11 +476,36 @@ export class ShadowRepository {
   
   async cleanup(): Promise<void> {
     if (await fs.pathExists(this.shadowPath)) {
-      await fs.remove(this.shadowPath);
-      console.log(chalk.gray('🧹 Shadow repository cleaned up'));
+      try {
+        // Try to force remove with rm -rf first
+        await execAsync(`rm -rf "${this.shadowPath}"`);
+        console.log(chalk.gray('🧹 Shadow repository cleaned up'));
+      } catch (error) {
+        // Fallback to fs.remove with retry logic
+        let retries = 3;
+        while (retries > 0) {
+          try {
+            await fs.remove(this.shadowPath);
+            console.log(chalk.gray('🧹 Shadow repository cleaned up'));
+            break;
+          } catch (err) {
+            retries--;
+            if (retries === 0) {
+              console.error(chalk.yellow('⚠ Failed to cleanup shadow repository:'), err);
+            } else {
+              // Wait a bit before retry
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+          }
+        }
+      }
     }
     if (await fs.pathExists(this.rsyncExcludeFile)) {
-      await fs.remove(this.rsyncExcludeFile);
+      try {
+        await fs.remove(this.rsyncExcludeFile);
+      } catch (error) {
+        // Ignore exclude file cleanup errors
+      }
     }
   }
   

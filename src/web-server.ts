@@ -91,7 +91,7 @@ export class WebUIServer {
               AttachStdout: true,
               AttachStderr: true,
               Tty: true,
-              Cmd: ['claude', '--dangerously-skip-permissions'],
+              Cmd: ['/home/claude/start-session.sh'],
               WorkingDir: '/workspace',
               User: 'claude',
               Env: [

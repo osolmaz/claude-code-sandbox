@@ -5,10 +5,10 @@ import { SandboxConfig } from "./types";
 
 const DEFAULT_CONFIG: SandboxConfig = {
   dockerImage: "claude-code-sandbox:latest",
-  detached: false,
   autoPush: true,
   autoCreatePR: true,
   autoStartClaude: true,
+  defaultShell: "claude", // Default to Claude mode for backward compatibility
   claudeConfigPath: path.join(os.homedir(), ".claude.json"),
   setupCommands: [], // Example: ["npm install", "pip install -r requirements.txt"]
   allowedTools: ["*"], // All tools allowed in sandbox

@@ -49,6 +49,9 @@ export class ContainerManager {
     await new Promise((resolve) => setTimeout(resolve, 500));
     console.log(chalk.green("✓ Container ready"));
 
+    // Set up git branch and startup script
+    await this.setupGitAndStartupScript(container, containerConfig.branchName);
+
     // Run setup commands
     await this.runSetupCommands(container);
 
@@ -487,231 +490,6 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
     return volumes;
   }
 
-  async attach(containerId: string, branchName?: string): Promise<void> {
-    const container = this.containers.get(containerId);
-    if (!container) {
-      throw new Error("Container not found");
-    }
-
-    console.log(chalk.blue("• Connecting to container..."));
-
-    // Use provided branch name, config target branch, or generate one
-    const targetBranch =
-      branchName ||
-      this.config.targetBranch ||
-      `claude/${
-        new Date().toISOString().replace(/[:.]/g, "-").split("T")[0]
-      }-${Date.now()}`;
-
-    // First, set up the git branch and create startup script
-    try {
-      console.log(chalk.blue("• Setting up git branch and startup script..."));
-
-      // Create different startup scripts based on autoStartClaude setting
-      const startupScript = this.config.autoStartClaude
-        ? `#!/bin/bash
-echo "🚀 Starting Claude Code automatically..."
-echo "Press Ctrl+C to interrupt and access shell"
-echo ""
-claude --dangerously-skip-permissions
-echo ""
-echo "Claude exited. You now have access to the shell."
-echo "Type \"claude --dangerously-skip-permissions\" to restart Claude"
-echo "Type \"exit\" to end the session"
-exec /bin/bash`
-        : `#!/bin/bash
-echo "Welcome to Claude Code Sandbox!"
-echo "Type \"claude --dangerously-skip-permissions\" to start Claude Code"
-echo "Type \"exit\" to end the session"
-exec /bin/bash`;
-
-      const setupExec = await container.exec({
-        Cmd: [
-          "/bin/bash",
-          "-c",
-          `
-          cd /workspace &&
-          sudo chown -R claude:claude /workspace &&
-          git config --global --add safe.directory /workspace &&
-          # Clean up macOS resource fork files in git pack directory
-          find .git/objects/pack -name "._pack-*.idx" -type f -delete 2>/dev/null || true &&
-          # Configure git to use GitHub token if available
-          if [ -n "$GITHUB_TOKEN" ]; then
-            git config --global url."https://\${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-            git config --global url."https://\${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
-            echo "✓ Configured git to use GitHub token"
-          fi &&
-          # Try to checkout existing branch first, then create new if it doesn't exist
-          if git show-ref --verify --quiet refs/heads/"${targetBranch}"; then
-            git checkout "${targetBranch}" &&
-            echo "✓ Switched to existing branch: ${targetBranch}"
-          else
-            git checkout -b "${targetBranch}" &&
-            echo "✓ Created new branch: ${targetBranch}"
-          fi &&
-          echo '${startupScript}' > /home/claude/start-session.sh &&
-          chmod +x /home/claude/start-session.sh &&
-          echo "✓ Startup script created"
-        `,
-        ],
-        AttachStdout: true,
-        AttachStderr: true,
-      });
-
-      const setupStream = await setupExec.start({});
-
-      // Wait for setup to complete
-      await new Promise<void>((resolve, reject) => {
-        let output = "";
-        setupStream.on("data", (chunk) => {
-          output += chunk.toString();
-          process.stdout.write(chunk);
-        });
-        setupStream.on("end", () => {
-          if (
-            output.includes("✓ Created branch") &&
-            output.includes("✓ Startup script created")
-          ) {
-            resolve();
-          } else {
-            reject(new Error("Setup failed"));
-          }
-        });
-        setupStream.on("error", reject);
-      });
-
-      console.log(chalk.green("✓ Container setup completed"));
-
-      // Execute setup commands
-      await this.runSetupCommands(container);
-    } catch (error) {
-      console.error(chalk.red("✗ Setup failed:"), error);
-      throw error;
-    }
-
-    // Now create an interactive session that runs our startup script
-    console.log(chalk.blue("• Starting interactive session..."));
-    if (this.config.autoStartClaude) {
-      console.log(chalk.yellow("• Claude Code will start automatically"));
-      console.log(
-        chalk.yellow("• Press Ctrl+C to interrupt Claude and access the shell"),
-      );
-    } else {
-      console.log(
-        chalk.yellow(
-          '• Type "claude --dangerously-skip-permissions" to start Claude Code',
-        ),
-      );
-    }
-    console.log(
-      chalk.yellow('• Press Ctrl+D or type "exit" to end the session'),
-    );
-
-    const exec = await container.exec({
-      Cmd: ["/home/claude/start-session.sh"],
-      AttachStdin: true,
-      AttachStdout: true,
-      AttachStderr: true,
-      Tty: true,
-      WorkingDir: "/workspace",
-    });
-
-    // Start the exec with hijack mode for proper TTY
-    const stream = await exec.start({
-      hijack: true,
-      stdin: true,
-    });
-
-    // Set up TTY properly
-    const originalRawMode = process.stdin.isRaw;
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(true);
-    }
-    process.stdin.resume();
-
-    // Resize handler
-    const resize = async () => {
-      try {
-        await exec.resize({
-          w: process.stdout.columns || 80,
-          h: process.stdout.rows || 24,
-        });
-      } catch (e) {
-        // Ignore resize errors
-      }
-    };
-
-    // Initial resize
-    await resize();
-    process.stdout.on("resize", resize);
-
-    // Connect streams bidirectionally
-    stream.pipe(process.stdout);
-    process.stdin.pipe(stream);
-
-    // Set up proper cleanup
-    const cleanup = () => {
-      console.log(chalk.yellow("\nCleaning up session..."));
-      if (process.stdin.isTTY) {
-        process.stdin.setRawMode(originalRawMode);
-      }
-      process.stdin.pause();
-      process.stdout.removeListener("resize", resize);
-      if (stream && typeof stream.end === "function") {
-        stream.end();
-      }
-    };
-
-    // Return a promise that resolves when the session ends
-    return new Promise<void>((resolve, reject) => {
-      let sessionEnded = false;
-
-      const handleEnd = () => {
-        if (!sessionEnded) {
-          sessionEnded = true;
-          console.log(chalk.yellow("\nContainer session ended"));
-          cleanup();
-          resolve();
-        }
-      };
-
-      const handleError = (err: Error) => {
-        if (!sessionEnded) {
-          sessionEnded = true;
-          console.error(chalk.red("Stream error:"), err);
-          cleanup();
-          reject(err);
-        }
-      };
-
-      stream.on("end", handleEnd);
-      stream.on("close", handleEnd);
-      stream.on("error", handleError);
-
-      // Also monitor the exec process
-      const checkExec = async () => {
-        try {
-          const info = await exec.inspect();
-          if (info.ExitCode !== null && !sessionEnded) {
-            handleEnd();
-          }
-        } catch (e) {
-          // Exec might be gone
-          if (!sessionEnded) {
-            handleEnd();
-          }
-        }
-      };
-
-      // Check exec status periodically
-      const statusInterval = setInterval(checkExec, 1000);
-
-      // Clean up interval when session ends
-      stream.on("end", () => clearInterval(statusInterval));
-      stream.on("close", () => clearInterval(statusInterval));
-    });
-  }
-
   private async _copyWorkingDirectory(
     container: Docker.Container,
     workDir: string,
@@ -1085,6 +863,96 @@ exec /bin/bash`;
       );
       // Don't throw - this is not critical for container operation
     }
+  }
+
+  private async setupGitAndStartupScript(container: any, branchName: string): Promise<void> {
+    console.log(chalk.blue("• Setting up git branch and startup script..."));
+
+    // Determine what to show in the web UI
+    const defaultShell = this.config.defaultShell || "claude";
+    
+    // Startup script that keeps session alive
+    const startupScript = defaultShell === "claude" 
+      ? `#!/bin/bash
+echo "🚀 Starting Claude Code..."
+echo "Press Ctrl+C to drop to bash shell"
+echo ""
+
+# Run Claude but don't replace the shell process
+claude --dangerously-skip-permissions
+
+# After Claude exits, drop to bash
+echo ""
+echo "Claude exited. You're now in bash shell."
+echo "Type 'claude --dangerously-skip-permissions' to restart Claude"
+echo "Type 'exit' to end the session"
+echo ""
+exec /bin/bash`
+      : `#!/bin/bash
+echo "Welcome to Claude Code Sandbox!"
+echo "Type 'claude --dangerously-skip-permissions' to start Claude Code"
+echo "Type 'exit' to end the session"
+echo ""
+exec /bin/bash`;
+
+    const setupExec = await container.exec({
+      Cmd: [
+        "/bin/bash",
+        "-c",
+        `
+        cd /workspace &&
+        sudo chown -R claude:claude /workspace &&
+        git config --global --add safe.directory /workspace &&
+        # Clean up macOS resource fork files in git pack directory
+        find .git/objects/pack -name "._pack-*.idx" -type f -delete 2>/dev/null || true &&
+        # Configure git to use GitHub token if available
+        if [ -n "$GITHUB_TOKEN" ]; then
+          git config --global url."https://\${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://\${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
+          echo "✓ Configured git to use GitHub token"
+        fi &&
+        # Try to checkout existing branch first, then create new if it doesn't exist
+        if git show-ref --verify --quiet refs/heads/"${branchName}"; then
+          git checkout "${branchName}" &&
+          echo "✓ Switched to existing branch: ${branchName}"
+        else
+          git checkout -b "${branchName}" &&
+          echo "✓ Created new branch: ${branchName}"
+        fi &&
+        cat > /home/claude/start-session.sh << 'EOF'
+${startupScript}
+EOF
+        chmod +x /home/claude/start-session.sh &&
+        echo "✓ Startup script created"
+      `,
+      ],
+      AttachStdout: true,
+      AttachStderr: true,
+    });
+
+    const setupStream = await setupExec.start({});
+
+    // Wait for setup to complete
+    await new Promise<void>((resolve, reject) => {
+      let output = "";
+      setupStream.on("data", (chunk: any) => {
+        output += chunk.toString();
+        process.stdout.write(chunk);
+      });
+      setupStream.on("end", () => {
+        if (
+          (output.includes("✓ Created new branch") || output.includes("✓ Switched to existing branch")) &&
+          output.includes("✓ Startup script created")
+        ) {
+          resolve();
+        } else {
+          reject(new Error("Setup failed"));
+        }
+      });
+      setupStream.on("error", reject);
+    });
+
+    console.log(chalk.green("✓ Git and startup script setup completed"));
   }
 
   private async runSetupCommands(container: any): Promise<void> {

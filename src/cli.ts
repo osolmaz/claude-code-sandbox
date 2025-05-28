@@ -47,15 +47,17 @@ program
   .description("Run Claude Code in isolated Docker containers")
   .version("0.1.0");
 
-// Default command (start with web UI)
+// Default command (always web UI)
 program
-  .action(async () => {
+  .option("--shell <shell>", "Start with 'claude' or 'bash' shell", /^(claude|bash)$/i)
+  .action(async (options) => {
     console.log(chalk.blue("🚀 Starting Claude Sandbox..."));
     
     const config = await loadConfig("./claude-sandbox.config.json");
-    config.webUI = true; // Always use web UI by default
-    config.detached = true; // Web UI requires detached mode
-    config.includeUntracked = false; // Don't include untracked files by default
+    config.includeUntracked = false;
+    if (options.shell) {
+      config.defaultShell = options.shell.toLowerCase();
+    }
     
     const sandbox = new ClaudeSandbox(config);
     await sandbox.run();
@@ -67,22 +69,23 @@ program
   .description("Start a new Claude Sandbox container")
   .option("-c, --config <path>", "Configuration file", "./claude-sandbox.config.json")
   .option("-n, --name <name>", "Container name prefix")
-  .option("--no-web", "Disable web UI (use terminal attach)")
   .option("--no-push", "Disable automatic branch pushing")
   .option("--no-pr", "Disable automatic PR creation")
   .option("--include-untracked", "Include untracked files when copying to container")
   .option("-b, --branch <branch>", "Switch to specific branch on container start (creates if doesn't exist)")
+  .option("--shell <shell>", "Start with 'claude' or 'bash' shell", /^(claude|bash)$/i)
   .action(async (options) => {
     console.log(chalk.blue("🚀 Starting new Claude Sandbox container..."));
     
     const config = await loadConfig(options.config);
-    config.webUI = options.web !== false;
-    config.detached = config.webUI; // Web UI requires detached
     config.containerPrefix = options.name || config.containerPrefix;
     config.autoPush = options.push !== false;
     config.autoCreatePR = options.pr !== false;
     config.includeUntracked = options.includeUntracked || false;
     config.targetBranch = options.branch;
+    if (options.shell) {
+      config.defaultShell = options.shell.toLowerCase();
+    }
     
     const sandbox = new ClaudeSandbox(config);
     await sandbox.run();
@@ -92,8 +95,7 @@ program
 program
   .command("attach [container-id]")
   .description("Attach to an existing Claude Sandbox container")
-  .option("--no-web", "Use terminal attach instead of web UI")
-  .action(async (containerId, options) => {
+  .action(async (containerId) => {
     const spinner = ora("Looking for containers...").start();
     
     try {
@@ -111,56 +113,20 @@ program
         }
       }
       
-      spinner.text = "Attaching to container...";
+      spinner.text = "Launching web UI...";
       
-      if (options.web !== false) {
-        // Launch web UI for existing container
-        const webServer = new WebUIServer(docker);
-        const url = await webServer.start();
-        const fullUrl = `${url}?container=${targetContainerId}`;
-        
-        spinner.succeed(chalk.green(`Web UI available at: ${fullUrl}`));
-        await webServer.openInBrowser(fullUrl);
-        
-        console.log(chalk.yellow("Keep this terminal open to maintain the session"));
-        
-        // Keep process running
-        await new Promise(() => {});
-      } else {
-        // Direct terminal attach
-        spinner.stop();
-        console.log(chalk.blue(`Attaching to container ${targetContainerId.substring(0, 12)}...`));
-        
-        const container = docker.getContainer(targetContainerId);
-        const stream = await container.attach({
-          stream: true,
-          stdin: true,
-          stdout: true,
-          stderr: true
-        });
-        
-        // Set up TTY
-        if (process.stdin.isTTY) {
-          process.stdin.setRawMode(true);
-        }
-        process.stdin.resume();
-        
-        // Connect streams
-        stream.pipe(process.stdout);
-        process.stdin.pipe(stream);
-        
-        // Handle cleanup
-        const cleanup = () => {
-          if (process.stdin.isTTY) {
-            process.stdin.setRawMode(false);
-          }
-          process.stdin.pause();
-          stream.end();
-        };
-        
-        process.on('SIGINT', cleanup);
-        stream.on('end', cleanup);
-      }
+      // Always launch web UI
+      const webServer = new WebUIServer(docker);
+      const url = await webServer.start();
+      const fullUrl = `${url}?container=${targetContainerId}`;
+      
+      spinner.succeed(chalk.green(`Web UI available at: ${fullUrl}`));
+      await webServer.openInBrowser(fullUrl);
+      
+      console.log(chalk.yellow("Keep this terminal open to maintain the session"));
+      
+      // Keep process running
+      await new Promise(() => {});
     } catch (error: any) {
       spinner.fail(chalk.red(`Failed: ${error.message}`));
       process.exit(1);
