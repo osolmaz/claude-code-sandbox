@@ -14,7 +14,6 @@ export class ContainerManager {
   }
 
   async start(containerConfig: any): Promise<string> {
-    // Build or pull image
     await this.ensureImage();
 
     // Create container
@@ -781,6 +780,10 @@ exec /bin/bash`;
     const { execSync } = require("child_process");
     const fs = require("fs");
 
+    // Set tar flags to create archives with correct ownership (UID/GID 1000:1000)
+    // This eliminates the need for post-copy chown operations in the container
+    const TAR_OWNER_FLAGS = "--numeric-owner --owner=1000 --group=1000";
+
     try {
       // Get list of git-tracked files (including uncommitted changes)
       const trackedFiles = execSync("git ls-files", {
@@ -811,29 +814,18 @@ exec /bin/bash`;
 
       console.log(chalk.blue(`• Copying ${allFiles.length} files...`));
 
-      // Create tar archive using git archive for tracked files + untracked files
+      // Create a single tar archive with correct ownership from the start
+      // This replaces the previous git-archive + append approach and ensures
+      // all files have UID/GID 1000:1000 without needing container-side chown
       const tarFile = `/tmp/claude-sandbox-${Date.now()}.tar`;
+      const fileListPath = `/tmp/claude-sandbox-files-${Date.now()}.txt`;
+      fs.writeFileSync(fileListPath, allFiles.join("\n"));
 
-      // First create archive of tracked files using git archive
-      execSync(`git archive --format=tar -o "${tarFile}" HEAD`, {
-        cwd: workDir,
-        stdio: "pipe",
-      });
-
-      // Add untracked files if any
-      if (untrackedFiles.length > 0) {
-        // Create a file list for tar
-        const fileListPath = `/tmp/claude-sandbox-files-${Date.now()}.txt`;
-        fs.writeFileSync(fileListPath, untrackedFiles.join("\n"));
-
-        // Append untracked files to the tar
-        execSync(`tar -rf "${tarFile}" --files-from="${fileListPath}"`, {
-          cwd: workDir,
-          stdio: "pipe",
-        });
-
-        fs.unlinkSync(fileListPath);
-      }
+      execSync(
+        `tar ${TAR_OWNER_FLAGS} -cf "${tarFile}" --files-from="${fileListPath}"`,
+        { cwd: workDir, stdio: "pipe" },
+      );
+      fs.unlinkSync(fileListPath); // cleanup the temp list
 
       // Read and copy the tar file in chunks to avoid memory issues
       const stream = fs.createReadStream(tarFile);
@@ -860,11 +852,13 @@ exec /bin/bash`;
       // Also copy .git directory to preserve git history
       console.log(chalk.blue("• Copying git history..."));
       const gitTarFile = `/tmp/claude-sandbox-git-${Date.now()}.tar`;
-      // Exclude macOS resource fork files when creating git archive
-      execSync(`tar -cf "${gitTarFile}" --exclude="._*" .git`, {
-        cwd: workDir,
-        stdio: "pipe",
-      });
+      
+      // Create .git archive with correct ownership and exclude macOS resource fork files
+      // Using the same ownership flags ensures git files are also owned by claude user
+      execSync(
+        `tar ${TAR_OWNER_FLAGS} -cf "${gitTarFile}" --exclude="._*" .git`,
+        { cwd: workDir, stdio: "pipe" },
+      );
 
       try {
         const gitStream = fs.createReadStream(gitTarFile);
@@ -876,6 +870,7 @@ exec /bin/bash`;
 
         // Clean up
         fs.unlinkSync(gitTarFile);
+
       } catch (error) {
         console.error(chalk.red("✗ Git history copy failed:"), error);
         // Clean up the tar file even if upload failed
