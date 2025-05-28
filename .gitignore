@@ -144,3 +144,5 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+e2e-tests/dummy-repo/

@@ -166,6 +166,10 @@ export class ShadowRepository {
       try {
         await execAsync("git add .", { cwd: this.shadowPath });
         console.log(chalk.gray("  Staged all files for tracking"));
+        
+        // Create initial commit to ensure deletions can be tracked
+        await execAsync('git commit -m "Initial snapshot of working directory" --allow-empty', { cwd: this.shadowPath });
+        console.log(chalk.gray("  Created initial commit for change tracking"));
       } catch (stageError: any) {
         console.log(chalk.gray("  Could not stage files:", stageError.message));
       }
@@ -342,6 +346,13 @@ export class ShadowRepository {
       await this.syncWithDockerCp(containerId, containerPath);
     }
 
+    // Stage all changes including deletions
+    try {
+      await execAsync("git add -A", { cwd: this.shadowPath });
+    } catch (stageError) {
+      console.log(chalk.gray("  Could not stage changes:", stageError));
+    }
+
     console.log(chalk.green("✓ Files synced successfully"));
   }
 
@@ -413,6 +424,10 @@ export class ShadowRepository {
       `docker cp ${this.rsyncExcludeFile} ${containerId}:${containerExcludeFile}`,
     );
 
+    // Rsync directly from container to shadow repo with proper deletion handling
+    // First, clear the shadow repo (except .git) to ensure deletions are reflected
+    await execAsync(`find ${this.shadowPath} -mindepth 1 -not -path '${this.shadowPath}/.git*' -delete`);
+    
     // Rsync within container to staging area using exclude file
     const rsyncCmd = `docker exec ${containerId} rsync -av --delete \
       --exclude-from=${containerExcludeFile} \

@@ -1,0 +1,13 @@
+{
+  "name": "test-repo",
+  "version": "1.0.0",
+  "description": "Test repository for claude-sandbox",
+  "main": "src/main.js",
+  "scripts": {
+    "test": "node test/test.js",
+    "start": "node src/main.js"
+  },
+  "keywords": ["test", "claude", "sandbox"],
+  "author": "Test",
+  "license": "MIT"
+}

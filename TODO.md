@@ -12,3 +12,4 @@
   - a. Let user merge changes from remote to local: We would need to implement a conflict resolver somehow.
   - b. If conflicts arise, we could just block the operation and let user dump the current state in order not to lose work. This is the simplest option.
   - Either way, we need to think about how to apply new commits from the remote, because changes currently only flow from the sandbox to the shadow repo.
+- [ ] rsync, inotifywait, etc. should be included in the image, not installed in the fly
