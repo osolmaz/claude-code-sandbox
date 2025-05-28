@@ -15,12 +15,14 @@ export interface ShadowRepoOptions {
 export class ShadowRepository {
   private shadowPath: string;
   private initialized = false;
+  private rsyncExcludeFile: string;
   
   constructor(
     private options: ShadowRepoOptions,
     private basePath: string = '/tmp/claude-shadows'
   ) {
     this.shadowPath = path.join(this.basePath, this.options.sessionId);
+    this.rsyncExcludeFile = path.join(this.basePath, `${this.options.sessionId}-excludes.txt`);
   }
   
   async initialize(): Promise<void> {
@@ -140,12 +142,83 @@ export class ShadowRepository {
     }
   }
   
+  private async prepareGitignoreExcludes(): Promise<void> {
+    try {
+      // Start with built-in excludes
+      const excludes: string[] = [
+        '.git',
+        '.git/**',
+        'node_modules',
+        'node_modules/**',
+        '.next',
+        '.next/**',
+        '__pycache__',
+        '__pycache__/**',
+        '.venv',
+        '.venv/**',
+        '*.pyc',
+        '*.pyo',
+        '.DS_Store',
+        'Thumbs.db'
+      ];
+      
+      // Check for .gitignore in original repo
+      const gitignorePath = path.join(this.options.originalRepo, '.gitignore');
+      if (await fs.pathExists(gitignorePath)) {
+        const gitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
+        const lines = gitignoreContent.split('\n');
+        
+        for (const line of lines) {
+          const trimmed = line.trim();
+          // Skip empty lines and comments
+          if (!trimmed || trimmed.startsWith('#')) continue;
+          
+          // Convert gitignore patterns to rsync patterns
+          let pattern = trimmed;
+          
+          // Handle negation (gitignore: !pattern, rsync: + pattern)
+          if (pattern.startsWith('!')) {
+            // Rsync uses + for inclusion, but we'll skip these for simplicity
+            continue;
+          }
+          
+          // If pattern ends with /, it's a directory
+          if (pattern.endsWith('/')) {
+            excludes.push(pattern);
+            excludes.push(pattern + '**');
+          } else {
+            // Add the pattern as-is
+            excludes.push(pattern);
+            
+            // If it doesn't contain /, it matches anywhere, so add **/ prefix
+            if (!pattern.includes('/')) {
+              excludes.push('**/' + pattern);
+            }
+          }
+        }
+      }
+      
+      // Write excludes to file
+      await fs.writeFile(this.rsyncExcludeFile, excludes.join('\n'));
+      console.log(chalk.gray(`  Created rsync exclude file with ${excludes.length} patterns`));
+      
+    } catch (error) {
+      console.log(chalk.yellow('  Warning: Could not prepare gitignore excludes:', error));
+      // Create a basic exclude file with just the essentials
+      const basicExcludes = ['.git', 'node_modules', '.next', '__pycache__', '.venv'];
+      await fs.writeFile(this.rsyncExcludeFile, basicExcludes.join('\n'));
+    }
+  }
+
   async syncFromContainer(containerId: string, containerPath: string = '/workspace'): Promise<void> {
     if (!this.initialized) {
       await this.initialize();
     }
     
     console.log(chalk.blue('🔄 Syncing files from container...'));
+    
+    // Prepare gitignore excludes
+    await this.prepareGitignoreExcludes();
     
     // First, ensure files in container are owned by claude user
     try {
@@ -262,13 +335,13 @@ export class ShadowRepository {
     const tempDir = '/tmp/sync-staging';
     await execAsync(`docker exec ${containerId} mkdir -p ${tempDir}`);
     
-    // Rsync within container to staging area (excluding .git and node_modules)
+    // Copy exclude file to container
+    const containerExcludeFile = '/tmp/rsync-excludes.txt';
+    await execAsync(`docker cp ${this.rsyncExcludeFile} ${containerId}:${containerExcludeFile}`);
+    
+    // Rsync within container to staging area using exclude file
     const rsyncCmd = `docker exec ${containerId} rsync -av --delete \
-      --exclude=.git \
-      --exclude=node_modules \
-      --exclude=.next \
-      --exclude=dist \
-      --exclude=build \
+      --exclude-from=${containerExcludeFile} \
       ${containerPath}/ ${tempDir}/`;
     
     await execAsync(rsyncCmd);
@@ -276,8 +349,13 @@ export class ShadowRepository {
     // Copy from container staging to shadow repo
     await execAsync(`docker cp ${containerId}:${tempDir}/. ${this.shadowPath}/`);
     
-    // Clean up staging directory
-    await execAsync(`docker exec ${containerId} rm -rf ${tempDir}`);
+    // Clean up staging directory and exclude file
+    try {
+      await execAsync(`docker exec ${containerId} rm -rf ${tempDir}`);
+      await execAsync(`docker exec --user root ${containerId} rm -f ${containerExcludeFile}`);
+    } catch (cleanupError) {
+      // Ignore cleanup errors
+    }
   }
   
   private async syncWithDockerCp(containerId: string, containerPath: string): Promise<void> {
@@ -298,26 +376,53 @@ export class ShadowRepository {
       // Copy files to temp directory first (to avoid corrupting shadow repo)
       await execAsync(`docker cp ${containerId}:${containerPath}/. ${tempCopyPath}/`);
       
-      // Now selectively copy files to shadow repo, excluding git and unwanted dirs
-      const excludeDirs = ['.git', 'node_modules', '.next', 'dist', 'build', '__pycache__', '.venv'];
-      const excludePatterns = excludeDirs.map(dir => `--exclude=${dir}`).join(' ');
+      // Now selectively copy files to shadow repo, using exclude file
       
-      // Use rsync on host to copy files (excluding unwanted directories)
+      // Use rsync on host to copy files using exclude file
       try {
-        await execAsync(`rsync -av ${excludePatterns} ${tempCopyPath}/ ${this.shadowPath}/`);
+        await execAsync(`rsync -av --exclude-from=${this.rsyncExcludeFile} ${tempCopyPath}/ ${this.shadowPath}/`);
       } catch (rsyncError) {
         // Fallback to cp if rsync not available on host
         console.log(chalk.gray('  (rsync not available on host, using cp)'));
         
-        // Manual copy excluding directories
+        // Manual copy excluding directories - read exclude patterns
+        const excludeContent = await fs.readFile(this.rsyncExcludeFile, 'utf-8');
+        const excludePatterns = excludeContent.split('\n').filter(p => p.trim());
+        
         const { stdout: fileList } = await execAsync(`find ${tempCopyPath} -type f`);
         const files = fileList.trim().split('\n').filter(f => f.trim());
         
         for (const file of files) {
           const relativePath = path.relative(tempCopyPath, file);
           
-          // Skip excluded directories
-          if (excludeDirs.some(dir => relativePath.startsWith(dir + '/') || relativePath === dir)) {
+          // Check if file matches any exclude pattern
+          let shouldExclude = false;
+          for (const pattern of excludePatterns) {
+            if (!pattern) continue;
+            
+            // Simple pattern matching (not full glob)
+            if (pattern.includes('**')) {
+              const basePattern = pattern.replace('**/', '').replace('/**', '');
+              if (relativePath.includes(basePattern)) {
+                shouldExclude = true;
+                break;
+              }
+            } else if (pattern.endsWith('*')) {
+              const prefix = pattern.slice(0, -1);
+              if (relativePath.startsWith(prefix) || path.basename(relativePath).startsWith(prefix)) {
+                shouldExclude = true;
+                break;
+              }
+            } else {
+              if (relativePath === pattern || relativePath.startsWith(pattern + '/') || 
+                  path.basename(relativePath) === pattern) {
+                shouldExclude = true;
+                break;
+              }
+            }
+          }
+          
+          if (shouldExclude) {
             continue;
           }
           
@@ -373,6 +478,9 @@ export class ShadowRepository {
     if (await fs.pathExists(this.shadowPath)) {
       await fs.remove(this.shadowPath);
       console.log(chalk.gray('🧹 Shadow repository cleaned up'));
+    }
+    if (await fs.pathExists(this.rsyncExcludeFile)) {
+      await fs.remove(this.rsyncExcludeFile);
     }
   }
   
