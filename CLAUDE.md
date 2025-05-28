@@ -78,3 +78,17 @@ The tool looks for `claude-sandbox.config.json` in the working directory. Key op
 - `volumes`: Additional volume mounts
 - `allowedTools`: Claude tool permissions (default: all)
 - `autoPush`/`autoCreatePR`: Git workflow settings
+
+## Development Workflow
+
+Start a new sandbox:
+
+```
+claude-sandbox start
+```
+
+Kill all running sandbox containers:
+
+```
+claude-sandbox purge -y
+```

@@ -7,3 +7,4 @@ dist/
 claude-sandbox.config.json
 !claude-sandbox.config.example.json
 reference-repos/
+scratch/

@@ -464,13 +464,15 @@ function initSocket() {
         console.log('[SYNC] Diff data:', data.diffData);
         
         if (data.hasChanges) {
-            updateStatus('connected', `📁 Changes synced: ${data.summary}`);
+            // Keep showing container ID in status
+            updateStatus('connected', `Connected to ${containerId.substring(0, 12)}`);
             updateChangesTab(data);
             
-            // Update file count badge
-            updateChangesTabBadge(data.diffData?.stats?.files || 0);
+            // Update file count badge with total changed files
+            const totalFiles = calculateTotalChangedFiles(data);
+            updateChangesTabBadge(totalFiles);
         } else {
-            updateStatus('connected', '✨ No changes to sync');
+            updateStatus('connected', `Connected to ${containerId.substring(0, 12)}`);
             clearChangesTab();
             updateChangesTabBadge(0);
         }
@@ -620,6 +622,26 @@ document.addEventListener('DOMContentLoaded', () => {
         set: (value) => { notificationSound = value; }
     });
 });
+
+// Calculate total changed files from sync data
+function calculateTotalChangedFiles(syncData) {
+    if (!syncData.diffData || !syncData.diffData.status) return 0;
+    
+    // Count unique files from git status
+    const statusLines = syncData.diffData.status.split('\n').filter(line => line.trim());
+    const uniqueFiles = new Set();
+    
+    statusLines.forEach(line => {
+        if (line.trim()) {
+            const filename = line.substring(3).trim();
+            if (filename) {
+                uniqueFiles.add(filename);
+            }
+        }
+    });
+    
+    return uniqueFiles.size;
+}
 
 // Update changes tab badge
 function updateChangesTabBadge(fileCount) {
