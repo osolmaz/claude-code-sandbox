@@ -510,13 +510,10 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
       // Get list of untracked files that aren't ignored (only if includeUntracked is true)
       let untrackedFiles: string[] = [];
       if (this.config.includeUntracked) {
-        untrackedFiles = execSync(
-          "git ls-files --others --exclude-standard",
-          {
-            cwd: workDir,
-            encoding: "utf-8",
-          },
-        )
+        untrackedFiles = execSync("git ls-files --others --exclude-standard", {
+          cwd: workDir,
+          encoding: "utf-8",
+        })
           .trim()
           .split("\n")
           .filter((f: string) => f);
@@ -865,15 +862,19 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
     }
   }
 
-  private async setupGitAndStartupScript(container: any, branchName: string): Promise<void> {
+  private async setupGitAndStartupScript(
+    container: any,
+    branchName: string,
+  ): Promise<void> {
     console.log(chalk.blue("• Setting up git branch and startup script..."));
 
     // Determine what to show in the web UI
     const defaultShell = this.config.defaultShell || "claude";
-    
+
     // Startup script that keeps session alive
-    const startupScript = defaultShell === "claude" 
-      ? `#!/bin/bash
+    const startupScript =
+      defaultShell === "claude"
+        ? `#!/bin/bash
 echo "🚀 Starting Claude Code..."
 echo "Press Ctrl+C to drop to bash shell"
 echo ""
@@ -888,7 +889,7 @@ echo "Type 'claude --dangerously-skip-permissions' to restart Claude"
 echo "Type 'exit' to end the session"
 echo ""
 exec /bin/bash`
-      : `#!/bin/bash
+        : `#!/bin/bash
 echo "Welcome to Claude Code Sandbox!"
 echo "Type 'claude --dangerously-skip-permissions' to start Claude Code"
 echo "Type 'exit' to end the session"
@@ -941,7 +942,8 @@ EOF
       });
       setupStream.on("end", () => {
         if (
-          (output.includes("✓ Created new branch") || output.includes("✓ Switched to existing branch")) &&
+          (output.includes("✓ Created new branch") ||
+            output.includes("✓ Switched to existing branch")) &&
           output.includes("✓ Startup script created")
         ) {
           resolve();
@@ -998,9 +1000,7 @@ EOF
               const info = await cmdExec.inspect();
               if (info.ExitCode !== 0) {
                 console.error(
-                  chalk.red(
-                    `✗ Command failed with exit code ${info.ExitCode}`,
-                  ),
+                  chalk.red(`✗ Command failed with exit code ${info.ExitCode}`),
                 );
                 hasError = true;
               } else {

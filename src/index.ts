@@ -39,13 +39,15 @@ export class ClaudeSandbox {
       console.log(chalk.blue(`Current branch: ${currentBranch.current}`));
 
       // Use target branch from config or generate one
-      const branchName = this.config.targetBranch || (() => {
-        const timestamp = new Date()
-          .toISOString()
-          .replace(/[:.]/g, "-")
-          .split("T")[0];
-        return `claude/${timestamp}-${Date.now()}`;
-      })();
+      const branchName =
+        this.config.targetBranch ||
+        (() => {
+          const timestamp = new Date()
+            .toISOString()
+            .replace(/[:.]/g, "-")
+            .split("T")[0];
+          return `claude/${timestamp}-${Date.now()}`;
+        })();
       console.log(chalk.blue(`Will create branch in container: ${branchName}`));
 
       // Discover credentials (optional - don't fail if not found)
@@ -73,19 +75,21 @@ export class ClaudeSandbox {
 
       // Always launch web UI
       this.webServer = new WebUIServer(this.docker);
-      
+
       // Pass repo info to web server
       this.webServer.setRepoInfo(process.cwd(), branchName);
-      
+
       const webUrl = await this.webServer.start();
-      
+
       // Open browser to the web UI with container ID
       const fullUrl = `${webUrl}?container=${containerId}`;
       await this.webServer.openInBrowser(fullUrl);
-      
+
       console.log(chalk.green(`\n✓ Web UI available at: ${fullUrl}`));
-      console.log(chalk.yellow("Keep this terminal open to maintain the session"));
-      
+      console.log(
+        chalk.yellow("Keep this terminal open to maintain the session"),
+      );
+
       // Keep the process running
       await new Promise(() => {}); // This will keep the process alive
     } catch (error) {
