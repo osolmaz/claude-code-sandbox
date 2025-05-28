@@ -126,6 +126,14 @@ export class ShadowRepository {
 
       console.log(chalk.green('✓ Shadow repository created'));
       this.initialized = true;
+      
+      // Stage all files after initial setup to track them
+      try {
+        await execAsync('git add .', { cwd: this.shadowPath });
+        console.log(chalk.gray('  Staged all files for tracking'));
+      } catch (stageError: any) {
+        console.log(chalk.gray('  Could not stage files:', stageError.message));
+      }
     } catch (error) {
       console.error(chalk.red('Failed to create shadow repository:'), error);
       throw error;
@@ -347,9 +355,9 @@ export class ShadowRepository {
     }
     
     const lines = status.trim().split('\n');
-    const modified = lines.filter(l => l.startsWith(' M')).length;
-    const added = lines.filter(l => l.startsWith('??')).length;
-    const deleted = lines.filter(l => l.startsWith(' D')).length;
+    const modified = lines.filter(l => l.startsWith(' M') || l.startsWith('M ') || l.startsWith('MM')).length;
+    const added = lines.filter(l => l.startsWith('??') || l.startsWith('A ') || l.startsWith('AM')).length;
+    const deleted = lines.filter(l => l.startsWith(' D') || l.startsWith('D ')).length;
     
     const summary = `Modified: ${modified}, Added: ${added}, Deleted: ${deleted}`;
     

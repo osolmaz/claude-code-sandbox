@@ -467,20 +467,12 @@ function initSocket() {
             updateStatus('connected', `📁 Changes synced: ${data.summary}`);
             updateChangesTab(data);
             
-            // Add indicator to Changes tab
-            const changesTab = document.getElementById('changes-tab');
-            if (changesTab) {
-                changesTab.classList.add('has-changes');
-                console.log('[SYNC] Added has-changes class to tab');
-            } else {
-                console.error('[SYNC] Changes tab not found!');
-            }
-            
-            // Auto-switch to changes tab if user wants to see
-            // (optional - can be removed if prefer to stay on terminal)
+            // Update file count badge
+            updateChangesTabBadge(data.diffData?.stats?.files || 0);
         } else {
             updateStatus('connected', '✨ No changes to sync');
             clearChangesTab();
+            updateChangesTabBadge(0);
         }
     });
 
@@ -629,6 +621,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// Update changes tab badge
+function updateChangesTabBadge(fileCount) {
+    const changesTab = document.getElementById('changes-tab');
+    if (!changesTab) return;
+    
+    // Remove existing badge
+    const existingBadge = changesTab.querySelector('.file-count-badge');
+    if (existingBadge) {
+        existingBadge.remove();
+    }
+    
+    // Add new badge if there are changes
+    if (fileCount > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'file-count-badge';
+        badge.textContent = fileCount.toString();
+        changesTab.appendChild(badge);
+    }
+}
+
 // Tab system functions
 function switchTab(tabName) {
     // Remove active class from all tabs and content
@@ -639,10 +651,7 @@ function switchTab(tabName) {
     document.getElementById(tabName + '-tab').classList.add('active');
     document.getElementById(tabName + '-content').classList.add('active');
     
-    // If switching to changes tab, remove the "has-changes" indicator
-    if (tabName === 'changes') {
-        document.getElementById('changes-tab').classList.remove('has-changes');
-    }
+    // Tab switching handled by active class now
     
     // Resize terminal if switching back to terminal tab
     if (tabName === 'terminal' && term && term.fit) {
@@ -655,26 +664,25 @@ function updateChangesTab(syncData) {
     console.log('[UI] updateChangesTab called with:', syncData);
     
     const container = document.getElementById('changes-container');
-    const noChanges = document.getElementById('no-changes');
     
     if (!container) {
         console.error('[UI] changes-container not found!');
         return;
     }
     
-    if (!noChanges) {
-        console.error('[UI] no-changes element not found!');
-        return;
-    }
-    
-    // Hide empty state
-    noChanges.style.display = 'none';
-    console.log('[UI] Hidden empty state');
+    // Clear existing content
+    container.innerHTML = '';
     
     // Create changes content
+    const diffStats = syncData.diffData?.stats || { additions: 0, deletions: 0, files: 0 };
+    const statsText = diffStats.files > 0 ? 
+        `${diffStats.files} file(s), +${diffStats.additions} -${diffStats.deletions}` : 
+        'No changes';
+    
     container.innerHTML = `
         <div class="changes-summary">
             <strong>Changes Summary:</strong> ${syncData.summary}
+            <div class="diff-stats">📊 ${statsText}</div>
         </div>
         
         <div class="diff-viewer">
@@ -731,8 +739,8 @@ function clearChangesTab() {
         </div>
     `;
     
-    // Remove changes indicator
-    document.getElementById('changes-tab').classList.remove('has-changes');
+    // Remove badge
+    updateChangesTabBadge(0);
 }
 
 function formatDiffForDisplay(diffData) {
@@ -749,9 +757,10 @@ function formatDiffForDisplay(diffData) {
                 const filename = line.substring(3);
                 let statusText = '';
                 if (status === '??') statusText = 'New file';
-                else if (status === ' M') statusText = 'Modified';
-                else if (status === ' D') statusText = 'Deleted';
-                else if (status === 'A ') statusText = 'Added';
+                else if (status === ' M' || status === 'M ' || status === 'MM') statusText = 'Modified';
+                else if (status === ' D' || status === 'D ') statusText = 'Deleted';
+                else if (status === 'A ' || status === 'AM') statusText = 'Added';
+                else statusText = `Status: ${status}`;
                 
                 lines.push(`<div class="diff-line context">  ${statusText}: ${filename}</div>`);
             }

@@ -30,7 +30,7 @@ export class WebUIServer {
   private syncInProgress: Set<string> = new Set(); // Track containers currently syncing
   private originalRepo: string = '';
   private currentBranch: string = 'main';
-  private monitoringIntervals: Map<string, NodeJS.Timeout> = new Map(); // container -> monitoring interval
+  private fileWatchers: Map<string, any> = new Map(); // container -> monitor (inotify stream or interval)
 
   constructor(docker: Docker) {
     this.docker = docker;
@@ -263,6 +263,10 @@ export class WebUIServer {
             throw new Error('Shadow repository not found');
           }
           
+          // Perform final sync before commit to ensure we have latest changes
+          console.log(chalk.blue('🔄 Final sync before commit...'));
+          await shadowRepo.syncFromContainer(containerId);
+          
           const shadowPath = shadowRepo.getPath();
           
           // Stage all changes
@@ -291,6 +295,10 @@ export class WebUIServer {
           if (!shadowRepo) {
             throw new Error('Shadow repository not found');
           }
+          
+          // Perform final sync before push to ensure we have latest changes
+          console.log(chalk.blue('🔄 Final sync before push...'));
+          await shadowRepo.syncFromContainer(containerId);
           
           const shadowPath = shadowRepo.getPath();
           
@@ -351,7 +359,7 @@ export class WebUIServer {
         this.shadowRepos.set(containerId, shadowRepo);
       }
       
-      // Sync files from container
+      // Sync files from container (inotify already told us there are changes)
       const shadowRepo = this.shadowRepos.get(containerId)!;
       await shadowRepo.syncFromContainer(containerId);
       
@@ -366,6 +374,8 @@ export class WebUIServer {
       
       // Get changes summary and diff data
       const changes = await shadowRepo.getChanges();
+      console.log(chalk.gray(`[MONITOR] Shadow repo changes:`, changes));
+      
       let diffData = null;
       
       if (changes.hasChanges) {
@@ -404,13 +414,18 @@ export class WebUIServer {
           untrackedFiles.push(filename);
         }
         
+        // Calculate diff statistics
+        const diffStats = this.calculateDiffStats(diffOutput);
+        
         diffData = {
           status: statusOutput,
           diff: diffOutput,
-          untrackedFiles: untrackedFiles
+          untrackedFiles: untrackedFiles,
+          stats: diffStats
         };
         
         console.log(chalk.cyan(`[MONITOR] Changes detected: ${changes.summary}`));
+        console.log(chalk.cyan(`[MONITOR] Diff stats:`, diffStats));
       }
       
       const syncCompleteData = {
@@ -448,28 +463,145 @@ export class WebUIServer {
     }
   }
 
-  private startContinuousMonitoring(containerId: string): void {
-    // Clear existing interval if any
-    if (this.monitoringIntervals.has(containerId)) {
-      clearInterval(this.monitoringIntervals.get(containerId)!);
+  private async startContinuousMonitoring(containerId: string): Promise<void> {
+    // Clear existing monitoring if any
+    this.stopContinuousMonitoring(containerId);
+    
+    console.log(chalk.blue(`[MONITOR] Starting inotify-based monitoring for container ${containerId.substring(0, 12)}`));
+    
+    // Do initial sync
+    await this.performSync(containerId);
+    
+    // Install inotify-tools if not present
+    try {
+      await execAsync(`docker exec ${containerId} which inotifywait`);
+    } catch {
+      console.log(chalk.yellow('  Installing inotify-tools in container...'));
+      try {
+        // Try different package managers
+        const installCommands = [
+          'apt-get update && apt-get install -y inotify-tools',
+          'apk add --no-cache inotify-tools',
+          'yum install -y inotify-tools',
+          'dnf install -y inotify-tools'
+        ];
+        
+        let installed = false;
+        for (const cmd of installCommands) {
+          try {
+            await execAsync(`docker exec --user root ${containerId} sh -c "${cmd}"`);
+            installed = true;
+            break;
+          } catch {
+            continue;
+          }
+        }
+        
+        if (!installed) {
+          console.log(chalk.red('  Could not install inotify-tools, falling back to basic monitoring'));
+          return;
+        }
+      } catch (error) {
+        console.log(chalk.red('  Could not install inotify-tools:', error));
+        return;
+      }
     }
     
-    console.log(chalk.blue(`[MONITOR] Starting continuous monitoring for container ${containerId.substring(0, 12)}`));
+    // Start inotifywait process in container
+    const inotifyExec = await this.docker.getContainer(containerId).exec({
+      Cmd: ['sh', '-c', `inotifywait -m -r -e modify,create,delete,move --format '%w%f %e' /workspace --exclude '(\.git|node_modules|\.next|__pycache__|\.venv)'`],
+      AttachStdout: true,
+      AttachStderr: true,
+      Tty: false
+    });
     
-    // Start monitoring every 3 seconds
-    const interval = setInterval(async () => {
-      await this.performSync(containerId);
-    }, 3000);
+    const stream = await inotifyExec.start({ hijack: true, stdin: false });
     
-    this.monitoringIntervals.set(containerId, interval);
+    // Debounce sync to avoid too many rapid syncs
+    let syncTimeout: NodeJS.Timeout | null = null;
+    const debouncedSync = () => {
+      if (syncTimeout) clearTimeout(syncTimeout);
+      syncTimeout = setTimeout(async () => {
+        console.log(chalk.gray('[INOTIFY] Changes detected, syncing...'));
+        await this.performSync(containerId);
+      }, 500); // Wait 500ms after last change before syncing
+    };
+    
+    // Process inotify events
+    stream.on('data', (chunk: Buffer) => {
+      // Handle docker exec stream format (may have header bytes)
+      let data: Buffer;
+      if (chunk.length > 8) {
+        const firstByte = chunk[0];
+        if (firstByte >= 1 && firstByte <= 3) {
+          data = chunk.slice(8);
+        } else {
+          data = chunk;
+        }
+      } else {
+        data = chunk;
+      }
+      
+      const events = data.toString().trim().split('\n');
+      for (const event of events) {
+        if (event.trim()) {
+          console.log(chalk.gray(`[INOTIFY] ${event}`));
+          debouncedSync();
+        }
+      }
+    });
+    
+    stream.on('error', (err: Error) => {
+      console.error(chalk.red('[INOTIFY] Stream error:'), err);
+    });
+    
+    stream.on('end', () => {
+      console.log(chalk.yellow('[INOTIFY] Monitoring stopped'));
+    });
+    
+    // Store the stream for cleanup
+    this.fileWatchers.set(containerId, { stream, exec: inotifyExec } as any);
   }
 
   private stopContinuousMonitoring(containerId: string): void {
-    if (this.monitoringIntervals.has(containerId)) {
-      clearInterval(this.monitoringIntervals.get(containerId)!);
-      this.monitoringIntervals.delete(containerId);
+    const monitor = this.fileWatchers.get(containerId);
+    if (monitor) {
+      // If it's an inotify monitor, close the stream
+      if (monitor.stream) {
+        monitor.stream.destroy();
+      } else {
+        // Old interval-based monitoring
+        clearInterval(monitor as any);
+      }
+      this.fileWatchers.delete(containerId);
       console.log(chalk.blue(`[MONITOR] Stopped monitoring for container ${containerId.substring(0, 12)}`));
     }
+  }
+
+
+  private calculateDiffStats(diffOutput: string): { additions: number; deletions: number; files: number } {
+    if (!diffOutput) return { additions: 0, deletions: 0, files: 0 };
+    
+    let additions = 0;
+    let deletions = 0;
+    const files = new Set<string>();
+    
+    const lines = diffOutput.split('\n');
+    for (const line of lines) {
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        additions++;
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        deletions++;
+      } else if (line.startsWith('diff --git')) {
+        // Extract filename from diff header
+        const match = line.match(/diff --git a\/(.*?) b\//);
+        if (match) {
+          files.add(match[1]);
+        }
+      }
+    }
+    
+    return { additions, deletions, files: files.size };
   }
 
   async start(): Promise<string> {
