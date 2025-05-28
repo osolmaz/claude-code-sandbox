@@ -12,6 +12,11 @@
     "start": "node dist/cli.js",
     "lint": "eslint src/**/*.ts",
     "test": "jest",
+    "test:watch": "jest --watch",
+    "test:unit": "jest test/unit",
+    "test:integration": "jest test/integration",
+    "test:e2e": "cd test/e2e && ./run-tests.sh",
+    "test:coverage": "jest --coverage",
     "purge-containers": "docker ps -a --filter \"ancestor=claude-code-sandbox:latest\" -q | xargs -r docker rm -f && docker rmi claude-code-sandbox:latest"
   },
   "keywords": [

@@ -44,7 +44,6 @@ async function runCoreTests() {
     // Test 1: File Addition
     console.log('\n🧪 Test 1: File Addition');
     await framework.addFile('addition-test.txt', 'New file content');
-    await framework.waitForSync();
     
     const addExists = await framework.shadowFileExists('addition-test.txt');
     if (!addExists) throw new Error('File addition failed');
@@ -66,7 +65,6 @@ async function runCoreTests() {
     );
     
     await framework.modifyFile('addition-test.txt', 'Modified content');
-    await framework.waitForSync();
     
     const modContent = await framework.getShadowFileContent('addition-test.txt');
     if (modContent.trim() !== 'Modified content') throw new Error('File modification failed');
@@ -80,7 +78,6 @@ async function runCoreTests() {
     // Test 3: File Deletion
     console.log('\n🧪 Test 3: File Deletion');
     await framework.deleteFile('addition-test.txt');
-    await framework.waitForSync();
     
     const delExists = await framework.shadowFileExists('addition-test.txt');
     if (delExists) throw new Error('File deletion failed - file still exists');
@@ -95,7 +92,6 @@ async function runCoreTests() {
     console.log('\n🧪 Test 4: Directory Operations');
     await framework.createDirectory('test-dir');
     await framework.addFile('test-dir/nested-file.txt', 'Nested content');
-    await framework.waitForSync();
     
     const nestedExists = await framework.shadowFileExists('test-dir/nested-file.txt');
     if (!nestedExists) throw new Error('Nested file creation failed');

@@ -147,22 +147,41 @@ class SyncTestFramework {
     });
   }
 
-  async waitForSync(expectedChanges = null, timeoutMs = 5000) {
-    // Just wait a fixed amount of time for sync to happen
-    await new Promise(resolve => setTimeout(resolve, 2000));
+  async waitForSync(expectedChanges = null, timeoutMs = 10000) {
+    const startTime = Date.now();
+    const initialEventCount = this.receivedSyncEvents.length;
     
-    // Return the latest event if any
-    if (this.receivedSyncEvents.length > 0) {
-      return this.receivedSyncEvents[this.receivedSyncEvents.length - 1];
+    // Wait for a new sync event or timeout
+    while (Date.now() - startTime < timeoutMs) {
+      // Check if we received a new sync event
+      if (this.receivedSyncEvents.length > initialEventCount) {
+        // Wait a bit more for the sync to fully complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return this.receivedSyncEvents[this.receivedSyncEvents.length - 1];
+      }
+      
+      // Also wait for the actual file to appear in shadow repo if we're checking for additions
+      if (expectedChanges && expectedChanges.filePath) {
+        const exists = await this.shadowFileExists(expectedChanges.filePath);
+        if (exists) {
+          // File exists, sync completed
+          await new Promise(resolve => setTimeout(resolve, 500));
+          return { data: { hasChanges: true, summary: 'Sync completed' } };
+        }
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    return { data: { hasChanges: true, summary: 'Sync completed' } };
+    // If no sync event was received, just wait a bit and return
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    return { data: { hasChanges: true, summary: 'Sync completed (timeout)' } };
   }
 
   async addFile(filePath, content) {
     const containerPath = `/workspace/${filePath}`;
     await execAsync(`docker exec ${this.containerId} bash -c "mkdir -p $(dirname ${containerPath}) && echo '${content}' > ${containerPath}"`);
-    return this.waitForSync();
+    return this.waitForSync({ filePath });
   }
 
   async modifyFile(filePath, newContent) {
