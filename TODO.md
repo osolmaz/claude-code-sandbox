@@ -2,6 +2,13 @@
 - [x] There is too much orchestration overhead to manage locally, so we need a UI to control, view, and do stuff outside of the container. The best thing is probably to create a web UI to be run locally, and the user will be redirected to this UI when they start a web app locally.
 - [x] Flag for including vs not including non-tracked files
 - [x] Specify with a flag which branch to switch to on container start
-- [ ] Create listener for Claude turn end, to commit, push and create a PR
-  - [ ] GH token should not be copied into the container, huge security risk
+- [x] Create listener for Claude turn end, to commit, push and create a PR
+  - [x] GH token should not be copied into the container, huge security risk
 - [ ] Being able to specify which setup commands to run before and after the copying of Git files.
+- [ ] Being able to specify a PR to checkout the sandbox from
+- [ ] Reattaching to a running or stopped sandbox consistently, without losing work
+- [ ] More consistent pushing of changes to GitHub
+- [ ] How should we deal with it if the local shadow repo falls behind the remote branch? Options:
+  - a. Let user merge changes from remote to local: We would need to implement a conflict resolver somehow.
+  - b. If conflicts arise, we could just block the operation and let user dump the current state in order not to lose work. This is the simplest option.
+  - Either way, we need to think about how to apply new commits from the remote, because changes currently only flow from the sandbox to the shadow repo.

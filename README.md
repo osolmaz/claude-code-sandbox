@@ -63,6 +63,7 @@ claude-sandbox
 ```
 
 This will:
+
 1. Create a new branch (`claude/[timestamp]`)
 2. Start a Docker container with Claude Code
 3. Launch a web UI at `http://localhost:3456`
@@ -71,13 +72,17 @@ This will:
 ### Commands
 
 #### `claude-sandbox` (default)
+
 Start a new container with web UI (recommended):
+
 ```bash
 claude-sandbox
 ```
 
 #### `claude-sandbox start`
+
 Explicitly start a new container with options:
+
 ```bash
 claude-sandbox start [options]
 
@@ -90,7 +95,9 @@ Options:
 ```
 
 #### `claude-sandbox attach [container-id]`
+
 Attach to an existing container:
+
 ```bash
 # Interactive selection
 claude-sandbox attach
@@ -103,7 +110,9 @@ Options:
 ```
 
 #### `claude-sandbox list`
+
 List all Claude Sandbox containers:
+
 ```bash
 claude-sandbox list
 claude-sandbox ls        # alias
@@ -113,7 +122,9 @@ Options:
 ```
 
 #### `claude-sandbox stop [container-id]`
+
 Stop containers:
+
 ```bash
 # Interactive selection
 claude-sandbox stop
@@ -126,7 +137,9 @@ claude-sandbox stop --all
 ```
 
 #### `claude-sandbox logs [container-id]`
+
 View container logs:
+
 ```bash
 claude-sandbox logs
 claude-sandbox logs abc123def456
@@ -137,14 +150,18 @@ Options:
 ```
 
 #### `claude-sandbox clean`
+
 Remove stopped containers:
+
 ```bash
 claude-sandbox clean
 claude-sandbox clean --force  # Remove all containers
 ```
 
 #### `claude-sandbox config`
+
 Show current configuration:
+
 ```bash
 claude-sandbox config
 ```
@@ -232,6 +249,7 @@ claude-sandbox --web
 ```
 
 This will:
+
 - Start the container in detached mode
 - Launch a web server on `http://localhost:3456`
 - Open your browser automatically

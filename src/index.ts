@@ -39,13 +39,15 @@ export class ClaudeSandbox {
       console.log(chalk.blue(`Current branch: ${currentBranch.current}`));
 
       // Use target branch from config or generate one
-      const branchName = this.config.targetBranch || (() => {
-        const timestamp = new Date()
-          .toISOString()
-          .replace(/[:.]/g, "-")
-          .split("T")[0];
-        return `claude/${timestamp}-${Date.now()}`;
-      })();
+      const branchName =
+        this.config.targetBranch ||
+        (() => {
+          const timestamp = new Date()
+            .toISOString()
+            .replace(/[:.]/g, "-")
+            .split("T")[0];
+          return `claude/${timestamp}-${Date.now()}`;
+        })();
       console.log(chalk.blue(`Will create branch in container: ${branchName}`));
 
       // Discover credentials (optional - don't fail if not found)
@@ -71,72 +73,25 @@ export class ClaudeSandbox {
       await this.gitMonitor.start(branchName);
       console.log(chalk.blue("✓ Git monitoring started"));
 
-      // Launch web UI if requested
-      if (this.config.webUI) {
-        this.webServer = new WebUIServer(this.docker);
-        const webUrl = await this.webServer.start();
-        
-        // Open browser to the web UI with container ID
-        const fullUrl = `${webUrl}?container=${containerId}`;
-        await this.webServer.openInBrowser(fullUrl);
-        
-        console.log(chalk.green(`\n✓ Web UI available at: ${fullUrl}`));
-        console.log(chalk.yellow("Keep this terminal open to maintain the session"));
-        
-        // Keep the process running
-        await new Promise(() => {}); // This will keep the process alive
-      }
-      // Attach to container or run detached
-      else if (!this.config.detached) {
-        console.log(chalk.blue("Preparing to attach to container..."));
+      // Always launch web UI
+      this.webServer = new WebUIServer(this.docker);
 
-        // Set up cleanup handler
-        const cleanup = async () => {
-          console.log(chalk.blue("\nShutting down..."));
-          await this.cleanup();
-          process.exit(0);
-        };
+      // Pass repo info to web server
+      this.webServer.setRepoInfo(process.cwd(), branchName);
 
-        // Handle process signals
-        process.on("SIGINT", cleanup);
-        process.on("SIGTERM", cleanup);
+      const webUrl = await this.webServer.start();
 
-        try {
-          console.log(chalk.gray("About to call attach method..."));
-          await this.containerManager.attach(containerId, branchName);
-          console.log(chalk.gray("Attach method completed"));
-        } catch (error) {
-          console.error(chalk.red("Failed to attach to container:"), error);
-          await this.cleanup();
-          throw error;
-        }
-      } else {
-        console.log(
-          chalk.blue(
-            "Running in detached mode. Container is running in the background.",
-          ),
-        );
-        console.log(chalk.gray(`Container ID: ${containerId}`));
-        console.log(chalk.yellow("\nTo connect to the container, run:"));
-        console.log(
-          chalk.white(`  docker attach ${containerId.substring(0, 12)}`),
-        );
-        console.log(chalk.yellow("\nOr use docker exec for a new shell:"));
-        console.log(
-          chalk.white(
-            `  docker exec -it ${containerId.substring(0, 12)} /bin/bash`,
-          ),
-        );
-        console.log(chalk.yellow("\nTo stop the container:"));
-        console.log(
-          chalk.white(`  docker stop ${containerId.substring(0, 12)}`),
-        );
-        console.log(
-          chalk.gray(
-            "\nThe container will continue running until you stop it manually.",
-          ),
-        );
-      }
+      // Open browser to the web UI with container ID
+      const fullUrl = `${webUrl}?container=${containerId}`;
+      await this.webServer.openInBrowser(fullUrl);
+
+      console.log(chalk.green(`\n✓ Web UI available at: ${fullUrl}`));
+      console.log(
+        chalk.yellow("Keep this terminal open to maintain the session"),
+      );
+
+      // Keep the process running
+      await new Promise(() => {}); // This will keep the process alive
     } catch (error) {
       console.error(chalk.red("Error:"), error);
       throw error;

@@ -1,199 +1,541 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Claude Code Sandbox - Terminal</title>
     <link rel="stylesheet" href="https://unpkg.com/xterm@5.3.0/css/xterm.css" />
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background-color: #1e1e1e;
-            color: #d4d4d4;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          Cantarell, sans-serif;
+        background-color: #1e1e1e;
+        color: #d4d4d4;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
 
-        .header {
-            background-color: #2d2d2d;
-            padding: 1rem;
-            border-bottom: 1px solid #3e3e3e;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
+      .header {
+        background-color: #2d2d2d;
+        padding: 1rem;
+        border-bottom: 1px solid #3e3e3e;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
 
-        .header h1 {
-            font-size: 1.25rem;
-            font-weight: 500;
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
+      .header h1 {
+        font-size: 1.25rem;
+        font-weight: 500;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
 
-        .status {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.875rem;
-        }
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+      }
 
-        .status-indicator {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: #4c4c4c;
-        }
+      .status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #4c4c4c;
+      }
 
-        .status-indicator.connected {
-            background-color: #4caf50;
-        }
+      .status-indicator.connected {
+        background-color: #4caf50;
+      }
 
-        .status-indicator.connecting {
-            background-color: #ff9800;
-            animation: pulse 1.5s infinite;
-        }
+      .status-indicator.connecting {
+        background-color: #ff9800;
+        animation: pulse 1.5s infinite;
+      }
 
-        .status-indicator.error {
-            background-color: #f44336;
-        }
+      .status-indicator.error {
+        background-color: #f44336;
+      }
 
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+      @keyframes pulse {
+        0% {
+          opacity: 1;
         }
+        50% {
+          opacity: 0.5;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
 
-        .terminal-container {
-            flex: 1;
-            padding: 1rem;
-            overflow: hidden;
-        }
+      .terminal-container {
+        flex: 1;
+        padding: 1rem;
+        overflow: hidden;
+      }
 
-        #terminal {
-            height: 100%;
-            background-color: #1e1e1e;
-        }
+      #terminal {
+        height: 100%;
+        background-color: #1e1e1e;
+      }
 
-        .controls {
-            background-color: #2d2d2d;
-            padding: 0.75rem 1rem;
-            border-top: 1px solid #3e3e3e;
-            display: flex;
-            gap: 0.5rem;
-            font-size: 0.875rem;
-        }
+      .controls {
+        background-color: #2d2d2d;
+        padding: 0.75rem 1rem;
+        border-top: 1px solid #3e3e3e;
+        display: flex;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+      }
 
-        .controls button {
-            background-color: #3c3c3c;
-            color: #cccccc;
-            border: 1px solid #4c4c4c;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.875rem;
-            transition: all 0.2s;
-        }
+      .controls button {
+        background-color: #3c3c3c;
+        color: #cccccc;
+        border: 1px solid #4c4c4c;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+      }
 
-        .controls button:hover {
-            background-color: #4c4c4c;
-            border-color: #5c5c5c;
-        }
+      .controls button:hover {
+        background-color: #4c4c4c;
+        border-color: #5c5c5c;
+      }
 
-        .controls button:active {
-            background-color: #3c3c3c;
-        }
+      .controls button:active {
+        background-color: #3c3c3c;
+      }
 
-        .info {
-            background-color: #364152;
-            border: 1px solid #4c5c74;
-            border-radius: 4px;
-            padding: 1rem;
-            margin: 1rem;
-            font-size: 0.875rem;
-            line-height: 1.5;
-        }
+      .controls label {
+        color: #cccccc;
+        font-size: 0.875rem;
+        cursor: pointer;
+        user-select: none;
+      }
 
-        .info code {
-            background-color: #2d3748;
-            padding: 0.125rem 0.25rem;
-            border-radius: 3px;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        }
+      .controls input[type="checkbox"] {
+        cursor: pointer;
+      }
 
-        .error-message {
-            background-color: #4a1e1e;
-            border: 1px solid #6a2e2e;
-            color: #ffcccc;
-            border-radius: 4px;
-            padding: 1rem;
-            margin: 1rem;
-            font-size: 0.875rem;
-        }
+      .info {
+        background-color: #364152;
+        border: 1px solid #4c5c74;
+        border-radius: 4px;
+        padding: 1rem;
+        margin: 1rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+      }
 
-        .loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-        }
+      .info code {
+        background-color: #2d3748;
+        padding: 0.125rem 0.25rem;
+        border-radius: 3px;
+        font-family: "Consolas", "Monaco", "Courier New", monospace;
+      }
 
-        .loading-spinner {
-            border: 3px solid #3c3c3c;
-            border-top: 3px solid #ffffff;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
+      .error-message {
+        background-color: #4a1e1e;
+        border: 1px solid #6a2e2e;
+        color: #ffcccc;
+        border-radius: 4px;
+        padding: 1rem;
+        margin: 1rem;
+        font-size: 0.875rem;
+      }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+      .loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+      }
+
+      .loading-spinner {
+        border: 3px solid #3c3c3c;
+        border-top: 3px solid #ffffff;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
         }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Input needed state */
+      body.input-needed .header {
+        background-color: #4a3526;
+        border-bottom-color: #ff8c42;
+        transition: all 0.3s ease;
+      }
+
+      /* Tab system */
+      .tabs {
+        background-color: #2d2d2d;
+        border-bottom: 1px solid #3e3e3e;
+        display: flex;
+        align-items: center;
+        padding: 0 1rem;
+      }
+
+      .tab {
+        background-color: transparent;
+        border: none;
+        color: #cccccc;
+        padding: 0.75rem 1.5rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+        position: relative;
+      }
+
+      .tab:hover {
+        color: #ffffff;
+        background-color: #3c3c3c;
+      }
+
+      .tab.active {
+        color: #ffffff;
+        border-bottom-color: #4caf50;
+        background-color: #1e1e1e;
+      }
+
+      .tab .file-count-badge {
+        display: inline-block;
+        margin-left: 8px;
+        padding: 2px 6px;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1;
+        color: #fff;
+        background-color: #1f6feb;
+        border-radius: 10px;
+        min-width: 20px;
+        text-align: center;
+      }
+
+      .tab-content {
+        flex: 1;
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .tab-content.active {
+        display: flex;
+      }
+
+      .changes-view {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .changes-header {
+        background-color: #2d2d2d;
+        padding: 1rem;
+        border-bottom: 1px solid #3e3e3e;
+      }
+
+      .changes-summary {
+        background: #2d2d2d;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        border-left: 4px solid #4caf50;
+        color: #e6edf3;
+      }
+
+      .diff-stats {
+        margin-top: 8px;
+        font-size: 0.875rem;
+        color: #7d8590;
+        font-family: "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      .changes-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 1rem;
+      }
+
+      .diff-viewer {
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 20px;
+        font-family: "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 13px;
+        line-height: 1.45;
+        overflow-x: auto;
+        flex: 1;
+        overflow-y: auto;
+      }
+
+      .diff-line {
+        padding: 2px 0;
+        white-space: pre;
+      }
+
+      .diff-line.added {
+        background: rgba(46, 160, 67, 0.15);
+        color: #3fb950;
+      }
+
+      .diff-line.removed {
+        background: rgba(248, 81, 73, 0.15);
+        color: #f85149;
+      }
+
+      .diff-line.context {
+        color: #e6edf3;
+      }
+
+      .diff-line.header {
+        color: #7d8590;
+        font-weight: bold;
+      }
+
+      .git-actions {
+        background: #2d2d2d;
+        padding: 20px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+      }
+
+      .git-actions h3 {
+        margin: 0 0 15px 0;
+        color: #fff;
+      }
+
+      #commit-message {
+        width: 100%;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 12px;
+        color: #e6edf3;
+        font-family: "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 14px;
+        resize: vertical;
+        margin-bottom: 15px;
+      }
+
+      .branch-input {
+        margin-bottom: 15px;
+      }
+
+      .branch-input label {
+        display: block;
+        margin-bottom: 5px;
+        color: #e6edf3;
+      }
+
+      #branch-name {
+        width: 200px;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 8px 12px;
+        color: #e6edf3;
+        font-family: "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      .btn {
+        background: #238636;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        margin-right: 10px;
+      }
+
+      .btn:hover {
+        background: #2ea043;
+      }
+
+      .btn:disabled {
+        background: #484f58;
+        cursor: not-allowed;
+      }
+
+      .btn-primary {
+        background: #1f6feb;
+      }
+
+      .btn-primary:hover {
+        background: #388bfd;
+      }
+
+      .btn-success {
+        background: #238636;
+      }
+
+      .btn-success:hover {
+        background: #2ea043;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #7d8590;
+      }
+
+      .empty-state h3 {
+        margin-bottom: 1rem;
+        font-size: 1.1rem;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
+    <!-- Hidden audio element for fallback sound -->
+    <audio id="notification-sound" style="display: none">
+      <source
+        src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwpGn+DyvmwhBCx+zPLZhjEGHWm98OScTgwOUrHx1ZdVDwr2hYmbe9FmXQY1Waj48noCAiaMr+xuQQEfcd/04FkGEly1+O18CgEiirLyalQDG3DY9ONfCBJZtPfvfgwCIYiw8m1aDBtu1fTiYwsVXLT47nkJAiKHrvJvXg0abtX04mMLFVy0+O55CQIih67yb14NGm7V9OJjCxVctPjueQkCIoeu8m9eDRpu1fTiYwsVXLT47nkJAiKHrvJvXg0abtX04mMLFVy0+O55CQIih67yb14NGm7V9OJjCxVctPjueQkCIoeu8m9eDRpu1fTiYwsVXLT47nkJAiKHrvJvXg0abtX04mMLFVy0+O55CQIih67yb14NGm7V9OJjCxVctPjueQkCIoeu8m9eDRpu1fTiYwsVXLT47nkJAiKHrvJvXg0abtX04mMLFVy0+O55CQIih67yb14NGm7V9OJjCxVctPjueQkCIoeu8m9eDRpu1fTiYwsVXLT47nkJAiKHrvJvXg0abtX04mMLFVy0+O55CQIih67yb14NGm7V9OJjCxVctPjueQkCIoeu8m9eDRpu1fTiYwsVXLT47nkJAiKHrvJvXg0abtX04mMLFVy0+O55CQIih67yb14NGgA="
+        preload="auto"
+      />
+    </audio>
     <div class="header">
-        <h1>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                <line x1="8" y1="21" x2="16" y2="21"></line>
-                <line x1="12" y1="17" x2="12" y2="21"></line>
-            </svg>
-            Claude Code Sandbox Terminal
-        </h1>
-        <div class="status">
-            <span class="status-indicator" id="status-indicator"></span>
-            <span id="status-text">Connecting...</span>
-        </div>
+      <h1>
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+          <line x1="8" y1="21" x2="16" y2="21"></line>
+          <line x1="12" y1="17" x2="12" y2="21"></line>
+        </svg>
+        Claude Code Sandbox
+      </h1>
+      <div class="status">
+        <span class="status-indicator" id="status-indicator"></span>
+        <span id="status-text">Connecting...</span>
+      </div>
     </div>
 
-    <div class="terminal-container">
+    <!-- Tab Bar -->
+    <div class="tabs">
+      <button
+        class="tab active"
+        id="terminal-tab"
+        onclick="switchTab('terminal')"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          style="margin-right: 6px"
+        >
+          <polyline points="4,17 10,11 4,5"></polyline>
+          <line x1="12" y1="19" x2="20" y2="19"></line>
+        </svg>
+        Terminal
+      </button>
+      <button class="tab" id="changes-tab" onclick="switchTab('changes')">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          style="margin-right: 6px"
+        >
+          <path
+            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+          ></path>
+          <polyline points="14,2 14,8 20,8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10,9 9,9 8,9"></polyline>
+        </svg>
+        Changes
+      </button>
+    </div>
+
+    <!-- Terminal Tab Content -->
+    <div class="tab-content active" id="terminal-content">
+      <div class="terminal-container">
         <div id="terminal"></div>
         <div class="loading" id="loading">
-            <div class="loading-spinner"></div>
-            <div>Connecting to container...</div>
+          <div class="loading-spinner"></div>
+          <div>Connecting to container...</div>
         </div>
-    </div>
+      </div>
 
-    <div class="controls">
+      <div class="controls">
         <button onclick="clearTerminal()">Clear</button>
         <button onclick="reconnect()">Reconnect</button>
         <button onclick="copySelection()">Copy Selection</button>
-        <span style="margin-left: auto; color: #888;">
-            Ctrl+C: Interrupt | Ctrl+D: Exit | Ctrl+L: Clear
+        <label
+          style="
+            margin-left: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+          "
+        >
+          <input type="checkbox" id="soundEnabled" checked />
+          <span>Sound notifications</span>
+        </label>
+        <span style="margin-left: auto; color: #888">
+          Ctrl+C: Interrupt | Ctrl+D: Exit | Ctrl+L: Clear
         </span>
+      </div>
+    </div>
+
+    <!-- Changes Tab Content -->
+    <div class="tab-content" id="changes-content">
+      <div class="changes-view">
+        <div class="changes-content" id="changes-container">
+          <div class="empty-state" id="no-changes">
+            <h3>No changes detected</h3>
+            <p>
+              Claude hasn't made any changes yet. Changes will appear here
+              automatically when Claude modifies files.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script src="https://unpkg.com/xterm@5.3.0/lib/xterm.js"></script>
@@ -201,5 +543,5 @@
     <script src="https://unpkg.com/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="/app.js"></script>
-</body>
+  </body>
 </html>

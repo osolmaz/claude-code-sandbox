@@ -7,11 +7,11 @@ export interface VolumeMount {
 export interface SandboxConfig {
   dockerImage?: string;
   dockerfile?: string;
-  detached?: boolean;
   containerPrefix?: string;
   autoPush?: boolean;
   autoCreatePR?: boolean;
   autoStartClaude?: boolean;
+  defaultShell?: "claude" | "bash";
   claudeConfigPath?: string;
   setupCommands?: string[];
   environment?: Record<string, string>;
@@ -21,7 +21,6 @@ export interface SandboxConfig {
   allowedTools?: string[];
   maxThinkingTokens?: number;
   bashTimeout?: number;
-  webUI?: boolean;
   includeUntracked?: boolean;
   targetBranch?: string;
 }
