@@ -30,6 +30,7 @@ export class WebUIServer {
   private syncInProgress: Set<string> = new Set(); // Track containers currently syncing
   private originalRepo: string = '';
   private currentBranch: string = 'main';
+  private monitoringIntervals: Map<string, NodeJS.Timeout> = new Map(); // container -> monitoring interval
 
   constructor(docker: Docker) {
     this.docker = docker;
@@ -168,11 +169,20 @@ export class WebUIServer {
                   connectedSocket.emit('container-disconnected');
                 }
               }
-              // Clean up session
+              // Stop continuous monitoring
+              this.stopContinuousMonitoring(containerId);
+              // Clean up session and shadow repo
               this.sessions.delete(containerId);
+              if (this.shadowRepos.has(containerId)) {
+                this.shadowRepos.get(containerId)?.cleanup();
+                this.shadowRepos.delete(containerId);
+              }
             });
             
             console.log(chalk.green('New Claude session started'));
+            
+            // Start continuous monitoring for this container
+            this.startContinuousMonitoring(containerId);
           } else {
             // Add this socket to the existing session
             console.log(chalk.blue('Reconnecting to existing Claude session'));
@@ -241,96 +251,7 @@ export class WebUIServer {
         console.log(chalk.yellow(`[TEST] Received test-sync event:`, data));
       });
 
-      socket.on('input-needed', async (data) => {
-        const { containerId } = data;
-        console.log(chalk.cyan(`[DEBUG] Received input-needed event for container: ${containerId}`));
-        console.log(chalk.cyan(`[DEBUG] Data received:`, data));
-        
-        // Prevent multiple concurrent syncs for the same container
-        if (this.syncInProgress.has(containerId)) {
-          console.log(chalk.gray('  Sync already in progress for this container, skipping...'));
-          return;
-        }
-        
-        this.syncInProgress.add(containerId);
-        console.log(chalk.blue('🔔 Input needed detected, triggering sync...'));
-        
-        try {
-          // Initialize shadow repo if not exists
-          if (!this.shadowRepos.has(containerId)) {
-            const shadowRepo = new ShadowRepository({
-              originalRepo: this.originalRepo || process.cwd(),
-              claudeBranch: this.currentBranch || 'claude-changes',
-              sessionId: containerId.substring(0, 12)
-            });
-            this.shadowRepos.set(containerId, shadowRepo);
-          }
-          
-          // Sync files from container
-          const shadowRepo = this.shadowRepos.get(containerId)!;
-          await shadowRepo.syncFromContainer(containerId);
-          
-          // Check if shadow repo actually has git initialized
-          const shadowPath = shadowRepo.getPath();
-          const gitPath = path.join(shadowPath, '.git');
-          
-          if (!await fs.pathExists(gitPath)) {
-            throw new Error('Shadow repository .git directory missing - sync may have failed');
-          }
-          
-          // Get changes summary and diff data
-          const changes = await shadowRepo.getChanges();
-          let diffData = null;
-          
-          if (changes.hasChanges) {
-            // Get detailed file status and diffs
-            const { stdout: statusOutput } = await execAsync('git status --porcelain', { 
-              cwd: shadowPath 
-            });
-            
-            const { stdout: diffOutput } = await execAsync('git diff HEAD', { 
-              cwd: shadowPath,
-              maxBuffer: 1024 * 1024 // 1MB limit
-            });
-            
-            // Get list of untracked files with their content
-            const untrackedFiles: string[] = [];
-            const statusLines = statusOutput.split('\n').filter(line => line.startsWith('??'));
-            for (const line of statusLines) {
-              const filename = line.substring(3);
-              untrackedFiles.push(filename);
-            }
-            
-            diffData = {
-              status: statusOutput,
-              diff: diffOutput,
-              untrackedFiles: untrackedFiles
-            };
-          }
-          
-          console.log(chalk.green('✅ Sync completed successfully'));
-          
-          const syncCompleteData = {
-            hasChanges: changes.hasChanges,
-            summary: changes.summary,
-            shadowPath: shadowPath,
-            diffData: diffData,
-            containerId: containerId
-          };
-          
-          console.log(chalk.cyan(`[DEBUG] Sending sync-complete event:`, syncCompleteData));
-          
-          // Send summary back to client
-          socket.emit('sync-complete', syncCompleteData);
-          
-        } catch (error: any) {
-          console.error(chalk.red('Sync failed:'), error);
-          socket.emit('sync-error', { message: error.message });
-        } finally {
-          // Always remove from sync progress
-          this.syncInProgress.delete(containerId);
-        }
-      });
+      // input-needed handler removed - now using continuous monitoring
 
       // Handle commit operation
       socket.on('commit-changes', async (data) => {
@@ -410,6 +331,145 @@ export class WebUIServer {
         }
       });
     });
+  }
+
+  private async performSync(containerId: string): Promise<void> {
+    if (this.syncInProgress.has(containerId)) {
+      return; // Skip if sync already in progress
+    }
+    
+    this.syncInProgress.add(containerId);
+    
+    try {
+      // Initialize shadow repo if not exists
+      if (!this.shadowRepos.has(containerId)) {
+        const shadowRepo = new ShadowRepository({
+          originalRepo: this.originalRepo || process.cwd(),
+          claudeBranch: this.currentBranch || 'claude-changes',
+          sessionId: containerId.substring(0, 12)
+        });
+        this.shadowRepos.set(containerId, shadowRepo);
+      }
+      
+      // Sync files from container
+      const shadowRepo = this.shadowRepos.get(containerId)!;
+      await shadowRepo.syncFromContainer(containerId);
+      
+      // Check if shadow repo actually has git initialized
+      const shadowPath = shadowRepo.getPath();
+      const gitPath = path.join(shadowPath, '.git');
+      
+      if (!await fs.pathExists(gitPath)) {
+        console.log(chalk.yellow('Shadow repository .git directory missing - skipping sync'));
+        return;
+      }
+      
+      // Get changes summary and diff data
+      const changes = await shadowRepo.getChanges();
+      let diffData = null;
+      
+      if (changes.hasChanges) {
+        // Get detailed file status and diffs
+        const { stdout: statusOutput } = await execAsync('git status --porcelain', { 
+          cwd: shadowPath 
+        });
+        
+        // Try git diff HEAD first, fallback to git diff if no HEAD
+        let diffOutput = '';
+        try {
+          const { stdout } = await execAsync('git diff HEAD', { 
+            cwd: shadowPath,
+            maxBuffer: 10 * 1024 * 1024 // 10MB limit
+          });
+          diffOutput = stdout;
+        } catch (headError) {
+          try {
+            // Fallback to git diff (shows unstaged changes)
+            const { stdout } = await execAsync('git diff', { 
+              cwd: shadowPath,
+              maxBuffer: 10 * 1024 * 1024 // 10MB limit
+            });
+            diffOutput = stdout;
+          } catch (diffError) {
+            console.log(chalk.gray('  Could not generate diff, skipping...'));
+            diffOutput = 'Could not generate diff';
+          }
+        }
+        
+        // Get list of untracked files with their content
+        const untrackedFiles: string[] = [];
+        const statusLines = statusOutput.split('\n').filter(line => line.startsWith('??'));
+        for (const line of statusLines) {
+          const filename = line.substring(3);
+          untrackedFiles.push(filename);
+        }
+        
+        diffData = {
+          status: statusOutput,
+          diff: diffOutput,
+          untrackedFiles: untrackedFiles
+        };
+        
+        console.log(chalk.cyan(`[MONITOR] Changes detected: ${changes.summary}`));
+      }
+      
+      const syncCompleteData = {
+        hasChanges: changes.hasChanges,
+        summary: changes.summary,
+        shadowPath: shadowPath,
+        diffData: diffData,
+        containerId: containerId
+      };
+      
+      // Send to all connected sockets for this container
+      const session = this.sessions.get(containerId);
+      if (session) {
+        for (const socketId of session.connectedSockets) {
+          const connectedSocket = this.io.sockets.sockets.get(socketId);
+          if (connectedSocket) {
+            connectedSocket.emit('sync-complete', syncCompleteData);
+          }
+        }
+      }
+      
+    } catch (error: any) {
+      console.error(chalk.red('[MONITOR] Sync failed:'), error);
+      const session = this.sessions.get(containerId);
+      if (session) {
+        for (const socketId of session.connectedSockets) {
+          const connectedSocket = this.io.sockets.sockets.get(socketId);
+          if (connectedSocket) {
+            connectedSocket.emit('sync-error', { message: error.message });
+          }
+        }
+      }
+    } finally {
+      this.syncInProgress.delete(containerId);
+    }
+  }
+
+  private startContinuousMonitoring(containerId: string): void {
+    // Clear existing interval if any
+    if (this.monitoringIntervals.has(containerId)) {
+      clearInterval(this.monitoringIntervals.get(containerId)!);
+    }
+    
+    console.log(chalk.blue(`[MONITOR] Starting continuous monitoring for container ${containerId.substring(0, 12)}`));
+    
+    // Start monitoring every 3 seconds
+    const interval = setInterval(async () => {
+      await this.performSync(containerId);
+    }, 3000);
+    
+    this.monitoringIntervals.set(containerId, interval);
+  }
+
+  private stopContinuousMonitoring(containerId: string): void {
+    if (this.monitoringIntervals.has(containerId)) {
+      clearInterval(this.monitoringIntervals.get(containerId)!);
+      this.monitoringIntervals.delete(containerId);
+      console.log(chalk.blue(`[MONITOR] Stopped monitoring for container ${containerId.substring(0, 12)}`));
+    }
   }
 
   async start(): Promise<string> {

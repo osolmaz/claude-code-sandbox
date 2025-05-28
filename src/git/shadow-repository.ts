@@ -107,6 +107,23 @@ export class ShadowRepository {
         console.log(chalk.gray('  (Could not configure remote URL, using local)'));
       }
       
+      // Create an initial commit if the repo is empty (no HEAD)
+      try {
+        await execAsync('git rev-parse HEAD', { cwd: this.shadowPath });
+      } catch (noHeadError) {
+        // No HEAD exists, create initial commit
+        console.log(chalk.blue('  Creating initial commit...'));
+        try {
+          await execAsync('git add .', { cwd: this.shadowPath });
+          await execAsync('git commit -m "Initial commit" --allow-empty', { cwd: this.shadowPath });
+          console.log(chalk.green('  ✓ Initial commit created'));
+        } catch (commitError) {
+          // If commit fails, create empty commit
+          await execAsync('git commit --allow-empty -m "Initial empty commit"', { cwd: this.shadowPath });
+          console.log(chalk.green('  ✓ Empty initial commit created'));
+        }
+      }
+
       console.log(chalk.green('✓ Shadow repository created'));
       this.initialized = true;
     } catch (error) {
@@ -199,11 +216,24 @@ export class ShadowRepository {
         
         for (const cmd of installCommands) {
           try {
-            await execAsync(`docker exec ${containerId} sh -c "${cmd}"`);
-            // Test if rsync is now available
-            await execAsync(`docker exec ${containerId} which rsync`);
-            console.log(chalk.green('  ✓ rsync installed successfully'));
-            return true;
+            // Try as root first, then as normal user
+            const execCommands = [
+              `docker exec --user root ${containerId} sh -c "${cmd}"`,
+              `docker exec ${containerId} sh -c "sudo ${cmd}"`,
+              `docker exec ${containerId} sh -c "${cmd}"`
+            ];
+            
+            for (const execCmd of execCommands) {
+              try {
+                await execAsync(execCmd);
+                // Test if rsync is now available
+                await execAsync(`docker exec ${containerId} which rsync`);
+                console.log(chalk.green('  ✓ rsync installed successfully'));
+                return true;
+              } catch (execError) {
+                continue;
+              }
+            }
           } catch (cmdError) {
             // Continue to next command
             continue;
