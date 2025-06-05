@@ -574,8 +574,9 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
       console.log(chalk.blue("• Copying git history..."));
       const gitTarFile = `/tmp/claude-sandbox-git-${Date.now()}.tar`;
       // Exclude macOS resource fork files and .DS_Store when creating git archive
+      // Also strip extended attributes to prevent macOS xattr issues in Docker
       execSync(
-        `tar -cf "${gitTarFile}" --exclude="._*" --exclude=".DS_Store" .git`,
+        `tar -cf "${gitTarFile}" --exclude="._*" --exclude=".DS_Store" --no-xattrs .git`,
         {
           cwd: workDir,
           stdio: "pipe",
@@ -753,7 +754,7 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
         console.log(chalk.blue("• Copying .claude directory..."));
 
         const tarFile = `/tmp/claude-dir-${Date.now()}.tar`;
-        execSync(`tar -cf "${tarFile}" -C "${os.homedir()}" .claude`, {
+        execSync(`tar -cf "${tarFile}" --no-xattrs -C "${os.homedir()}" .claude`, {
           stdio: "pipe",
         });
 
