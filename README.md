@@ -35,14 +35,10 @@ Claude Code Sandbox allows you to run Claude Code in isolated Docker containers,
 
 ## Installation
 
-Claude Code Sandbox must be built from source:
+Install Claude Code Sandbox globally from npm:
 
 ```bash
-git clone https://github.com/your-repo/claude-code-sandbox.git
-cd claude-code-sandbox
-npm install
-npm run build
-npm link  # Creates global 'claude-sandbox' command
+npm install -g @textcortex/claude-code-sandbox
 ```
 
 ### Prerequisites
@@ -440,6 +436,18 @@ node --version
 ```
 
 ## Development
+
+### Building from Source
+
+To build and develop Claude Code Sandbox from source:
+
+```bash
+git clone https://github.com/textcortex/claude-code-sandbox.git
+cd claude-code-sandbox
+npm install
+npm run build
+npm link  # Creates global 'claude-sandbox' command
+```
 
 ### Available Scripts
 

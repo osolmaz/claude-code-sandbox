@@ -1,5 +1,5 @@
 {
-  "name": "claude-code-sandbox",
+  "name": "@textcortex/claude-code-sandbox",
   "version": "0.1.0",
   "description": "Run Claude Code as an autonomous agent in Docker containers with git integration",
   "main": "dist/index.js",
@@ -26,8 +26,19 @@
     "sandbox",
     "automation"
   ],
-  "author": "",
+  "author": "TextCortex Dev Team",
   "license": "MIT",
+  "homepage": "https://github.com/textcortex/claude-code-sandbox#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/textcortex/claude-code-sandbox.git"
+  },
+  "bugs": {
+    "url": "https://github.com/textcortex/claude-code-sandbox/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@types/express": "^5.0.2",
     "@types/ws": "^8.18.1",
@@ -51,6 +62,7 @@
     "@types/dockerode": "^3.3.23",
     "@types/fs-extra": "^11.0.4",
     "@types/inquirer": "^9.0.8",
+    "@types/jest": "^29.5.12",
     "@types/node": "^20.11.5",
     "@types/puppeteer": "^5.4.7",
     "@types/socket.io-client": "^1.4.36",

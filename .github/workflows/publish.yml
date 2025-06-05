@@ -1,0 +1,52 @@
+name: Publish Package
+
+on:
+  push:
+    tags:
+      - "v*" # Version tags: v1.0.0, v1.0.1, etc.
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          registry-url: "https://registry.npmjs.org"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Extract version from tag and update package.json
+        run: |
+          # Get the version from the tag (remove 'v' prefix)
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Tag version: $TAG_VERSION"
+
+          # Update package.json with the version from the tag
+          npm version $TAG_VERSION --no-git-tag-version
+          echo "Version updated in package.json to: $TAG_VERSION"
+
+          # Verify the change
+          cat package.json | grep '"version"'
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Publish
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
