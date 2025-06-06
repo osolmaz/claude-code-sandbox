@@ -208,10 +208,17 @@ export class ShadowRepository {
         const { stdout } = await execAsync("git ls-files", {
           cwd: this.options.originalRepo,
         });
-        trackedFiles = stdout.trim().split("\n").filter(f => f.trim());
-        console.log(chalk.gray(`  Found ${trackedFiles.length} git-tracked files`));
+        trackedFiles = stdout
+          .trim()
+          .split("\n")
+          .filter((f) => f.trim());
+        console.log(
+          chalk.gray(`  Found ${trackedFiles.length} git-tracked files`),
+        );
       } catch (error) {
-        console.log(chalk.yellow("  Warning: Could not get git-tracked files:", error));
+        console.log(
+          chalk.yellow("  Warning: Could not get git-tracked files:", error),
+        );
       }
 
       // Check for .gitignore in original repo
@@ -268,9 +275,9 @@ export class ShadowRepository {
 
       // Write the rsync rules file: includes first, then excludes
       // Rsync processes rules in order, so includes must come before excludes
-      const allRules = [...uniqueIncludes, ...excludes.map(e => `- ${e}`)];
+      const allRules = [...uniqueIncludes, ...excludes.map((e) => `- ${e}`)];
       await fs.writeFile(this.rsyncExcludeFile, allRules.join("\n"));
-      
+
       console.log(
         chalk.gray(
           `  Created rsync rules file with ${uniqueIncludes.length} includes and ${excludes.length} excludes`,
@@ -293,68 +300,98 @@ export class ShadowRepository {
   }
 
   async resetToContainerBranch(containerId: string): Promise<void> {
-    console.log(chalk.blue("🔄 Resetting shadow repo to match container branch..."));
-    
+    console.log(
+      chalk.blue("🔄 Resetting shadow repo to match container branch..."),
+    );
+
     try {
       // Ensure shadow repo is initialized first
       if (!this.initialized) {
         await this.initialize();
       }
-      
+
       // Get the current branch from the container
       const { stdout: containerBranch } = await execAsync(
-        `docker exec ${containerId} git -C /workspace rev-parse --abbrev-ref HEAD`
+        `docker exec ${containerId} git -C /workspace rev-parse --abbrev-ref HEAD`,
       );
       const targetBranch = containerBranch.trim();
       console.log(chalk.blue(`  Container is on branch: ${targetBranch}`));
-      
+
       // Get the current branch in shadow repo (if it has one)
       let currentShadowBranch = "";
       try {
         const { stdout: shadowBranch } = await execAsync(
           "git rev-parse --abbrev-ref HEAD",
-          { cwd: this.shadowPath }
+          { cwd: this.shadowPath },
         );
         currentShadowBranch = shadowBranch.trim();
         console.log(chalk.blue(`  Shadow repo is on: ${currentShadowBranch}`));
       } catch (error) {
         console.log(chalk.blue(`  Shadow repo has no HEAD yet`));
       }
-      
+
       if (targetBranch !== currentShadowBranch) {
-        console.log(chalk.blue(`  Resetting shadow repo to match container...`));
-        
+        console.log(
+          chalk.blue(`  Resetting shadow repo to match container...`),
+        );
+
         // Fetch all branches from the original repo
         try {
           await execAsync("git fetch origin", { cwd: this.shadowPath });
         } catch (error) {
           console.warn(chalk.yellow("Warning: Failed to fetch from origin"));
         }
-        
+
         // Check if the target branch exists remotely and create/checkout accordingly
         try {
           // Try to checkout the branch if it exists remotely and reset to match it
-          await execAsync(`git checkout -B ${targetBranch} origin/${targetBranch}`, { cwd: this.shadowPath });
-          console.log(chalk.green(`✓ Shadow repo reset to remote branch: ${targetBranch}`));
+          await execAsync(
+            `git checkout -B ${targetBranch} origin/${targetBranch}`,
+            { cwd: this.shadowPath },
+          );
+          console.log(
+            chalk.green(
+              `✓ Shadow repo reset to remote branch: ${targetBranch}`,
+            ),
+          );
         } catch (error) {
           try {
             // If that fails, try to checkout locally existing branch
-            await execAsync(`git checkout ${targetBranch}`, { cwd: this.shadowPath });
-            console.log(chalk.green(`✓ Shadow repo switched to local branch: ${targetBranch}`));
+            await execAsync(`git checkout ${targetBranch}`, {
+              cwd: this.shadowPath,
+            });
+            console.log(
+              chalk.green(
+                `✓ Shadow repo switched to local branch: ${targetBranch}`,
+              ),
+            );
           } catch (localError) {
             // If that fails too, create a new branch
-            await execAsync(`git checkout -b ${targetBranch}`, { cwd: this.shadowPath });
-            console.log(chalk.green(`✓ Shadow repo created new branch: ${targetBranch}`));
+            await execAsync(`git checkout -b ${targetBranch}`, {
+              cwd: this.shadowPath,
+            });
+            console.log(
+              chalk.green(`✓ Shadow repo created new branch: ${targetBranch}`),
+            );
           }
         }
-        
+
         // Mark that we need to resync after branch reset
-        console.log(chalk.blue(`✓ Branch reset complete - files will be synced next`));
+        console.log(
+          chalk.blue(`✓ Branch reset complete - files will be synced next`),
+        );
       } else {
-        console.log(chalk.gray(`  Shadow repo already on correct branch: ${targetBranch}`));
+        console.log(
+          chalk.gray(
+            `  Shadow repo already on correct branch: ${targetBranch}`,
+          ),
+        );
       }
     } catch (error) {
-      console.warn(chalk.yellow("⚠ Failed to reset shadow repo branch:"), error);
+      console.warn(
+        chalk.yellow("⚠ Failed to reset shadow repo branch:"),
+        error,
+      );
     }
   }
 

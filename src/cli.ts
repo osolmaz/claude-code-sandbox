@@ -93,10 +93,7 @@ program
     "--remote-branch <branch>",
     "Checkout a remote branch (e.g., origin/feature-branch)",
   )
-  .option(
-    "--pr <number>",
-    "Checkout a specific PR by number",
-  )
+  .option("--pr <number>", "Checkout a specific PR by number")
   .option(
     "--shell <shell>",
     "Start with 'claude' or 'bash' shell",

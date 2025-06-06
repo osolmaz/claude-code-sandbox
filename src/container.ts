@@ -50,7 +50,12 @@ export class ContainerManager {
     console.log(chalk.green("✓ Container ready"));
 
     // Set up git branch and startup script
-    await this.setupGitAndStartupScript(container, containerConfig.branchName, containerConfig.prFetchRef, containerConfig.remoteFetchRef);
+    await this.setupGitAndStartupScript(
+      container,
+      containerConfig.branchName,
+      containerConfig.prFetchRef,
+      containerConfig.remoteFetchRef,
+    );
 
     // Run setup commands
     await this.runSetupCommands(container);
@@ -780,9 +785,12 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
 
         const tarFile = `/tmp/claude-dir-${Date.now()}.tar`;
         const tarFlags = getTarFlags();
-        execSync(`tar -cf "${tarFile}" ${tarFlags} -C "${os.homedir()}" .claude`, {
-          stdio: "pipe",
-        });
+        execSync(
+          `tar -cf "${tarFile}" ${tarFlags} -C "${os.homedir()}" .claude`,
+          {
+            stdio: "pipe",
+          },
+        );
 
         const stream = fs.createReadStream(tarFile);
         await container.putArchive(stream, {
@@ -945,7 +953,7 @@ exec /bin/bash`;
           echo "✓ Configured git to use GitHub token"
         fi &&
         # Handle different branch setup scenarios
-        if [ -n "${prFetchRef || ''}" ]; then
+        if [ -n "${prFetchRef || ""}" ]; then
           echo "• Fetching PR branch..." &&
           git fetch origin ${prFetchRef} &&
           if git show-ref --verify --quiet refs/heads/"${branchName}"; then
@@ -955,7 +963,7 @@ exec /bin/bash`;
             git checkout "${branchName}" &&
             echo "✓ Checked out PR branch: ${branchName}"
           fi
-        elif [ -n "${remoteFetchRef || ''}" ]; then
+        elif [ -n "${remoteFetchRef || ""}" ]; then
           echo "• Fetching remote branch..." &&
           git fetch origin &&
           if git show-ref --verify --quiet refs/heads/"${branchName}"; then

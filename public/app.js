@@ -646,7 +646,9 @@ function copySelection() {
 async function fetchGitInfo() {
   try {
     // Use container ID if available to get branch from shadow repo
-    const url = containerId ? `/api/git/info?containerId=${containerId}` : "/api/git/info";
+    const url = containerId
+      ? `/api/git/info?containerId=${containerId}`
+      : "/api/git/info";
     const response = await fetch(url);
     if (response.ok) {
       const data = await response.json();
@@ -667,7 +669,7 @@ function updateGitInfo(data) {
   if (data.currentBranch) {
     // Clear existing content
     branchNameElement.innerHTML = "";
-    
+
     if (data.branchUrl) {
       // Create clickable branch link
       const branchLink = document.createElement("a");
@@ -688,7 +690,7 @@ function updateGitInfo(data) {
       // Fallback to plain text
       branchNameElement.textContent = data.currentBranch;
     }
-    
+
     gitInfoElement.style.display = "inline-block";
   }
 
@@ -696,13 +698,13 @@ function updateGitInfo(data) {
   prInfoElement.innerHTML = "";
 
   if (data.prs && data.prs.length > 0) {
-    data.prs.forEach(pr => {
+    data.prs.forEach((pr) => {
       const prBadge = document.createElement("a");
       prBadge.className = "pr-badge";
       prBadge.href = pr.url;
       prBadge.target = "_blank";
       prBadge.title = pr.title;
-      
+
       // Set badge class based on state
       if (pr.isDraft) {
         prBadge.classList.add("draft");
@@ -717,7 +719,7 @@ function updateGitInfo(data) {
         prBadge.classList.add("merged");
         prBadge.textContent = `Merged PR #${pr.number}`;
       }
-      
+
       prInfoElement.appendChild(prBadge);
     });
   }
@@ -730,10 +732,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   initTerminal();
   initSocket();
-  
+
   // Fetch git info on load
   fetchGitInfo();
-  
+
   // Refresh git info periodically
   setInterval(fetchGitInfo, 30000); // Every 30 seconds
 

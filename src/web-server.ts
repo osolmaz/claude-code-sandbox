@@ -75,16 +75,19 @@ export class WebUIServer {
         const containerId = req.query.containerId as string;
         let currentBranch = "loading...";
         let workingDir = this.originalRepo || process.cwd();
-        
+
         // If containerId is provided, try to get branch from shadow repo
         if (containerId && this.shadowRepos.has(containerId)) {
           const shadowRepo = this.shadowRepos.get(containerId)!;
           const shadowPath = shadowRepo.getPath();
           if (shadowPath) {
             try {
-              const branchResult = await execAsync("git rev-parse --abbrev-ref HEAD", {
-                cwd: shadowPath,
-              });
+              const branchResult = await execAsync(
+                "git rev-parse --abbrev-ref HEAD",
+                {
+                  cwd: shadowPath,
+                },
+              );
               currentBranch = branchResult.stdout.trim();
               // Use original repo for PR lookup (PRs are created against the main repo)
             } catch (error) {
@@ -93,9 +96,12 @@ export class WebUIServer {
           }
         } else {
           // Fallback to original repo
-          const branchResult = await execAsync("git rev-parse --abbrev-ref HEAD", {
-            cwd: workingDir,
-          });
+          const branchResult = await execAsync(
+            "git rev-parse --abbrev-ref HEAD",
+            {
+              cwd: workingDir,
+            },
+          );
           currentBranch = branchResult.stdout.trim();
         }
 
@@ -106,10 +112,12 @@ export class WebUIServer {
             cwd: this.originalRepo || process.cwd(),
           });
           const remoteUrl = remoteResult.stdout.trim();
-          
+
           // Convert SSH URLs to HTTPS for web links
           if (remoteUrl.startsWith("git@github.com:")) {
-            repoUrl = remoteUrl.replace("git@github.com:", "https://github.com/").replace(".git", "");
+            repoUrl = remoteUrl
+              .replace("git@github.com:", "https://github.com/")
+              .replace(".git", "");
           } else if (remoteUrl.startsWith("https://")) {
             repoUrl = remoteUrl.replace(".git", "");
           }
@@ -124,7 +132,7 @@ export class WebUIServer {
             `gh pr list --head "${currentBranch}" --json number,title,state,url,isDraft,mergeable`,
             {
               cwd: this.originalRepo || process.cwd(),
-            }
+            },
           );
           prs = JSON.parse(prResult.stdout || "[]");
         } catch (error) {
@@ -462,7 +470,7 @@ export class WebUIServer {
         });
         this.shadowRepos.set(containerId, shadowRepo);
         isNewShadowRepo = true;
-        
+
         // Reset shadow repo to match container's branch (important for PR/remote branch scenarios)
         await shadowRepo.resetToContainerBranch(containerId);
       }
@@ -470,22 +478,30 @@ export class WebUIServer {
       // Sync files from container (inotify already told us there are changes)
       const shadowRepo = this.shadowRepos.get(containerId)!;
       await shadowRepo.syncFromContainer(containerId);
-      
+
       // If this is a new shadow repo, establish a clean baseline after the first sync
       if (isNewShadowRepo) {
-        console.log(chalk.blue("🔄 Establishing clean baseline for new shadow repo..."));
+        console.log(
+          chalk.blue("🔄 Establishing clean baseline for new shadow repo..."),
+        );
         const shadowPath = shadowRepo.getPath();
-        
+
         try {
           // Stage all synced files and create a baseline commit
           await execAsync("git add -A", { cwd: shadowPath });
-          await execAsync('git commit -m "Establish baseline from container content" --allow-empty', { cwd: shadowPath });
+          await execAsync(
+            'git commit -m "Establish baseline from container content" --allow-empty',
+            { cwd: shadowPath },
+          );
           console.log(chalk.green("✓ Clean baseline established"));
-          
+
           // Now do one more sync to see if there are any actual changes
           await shadowRepo.syncFromContainer(containerId);
         } catch (baselineError) {
-          console.warn(chalk.yellow("Warning: Could not establish baseline"), baselineError);
+          console.warn(
+            chalk.yellow("Warning: Could not establish baseline"),
+            baselineError,
+          );
         }
       }
 
@@ -504,7 +520,9 @@ export class WebUIServer {
 
       // Get changes summary and diff data
       const changes = await shadowRepo.getChanges();
-      console.log(chalk.gray(`[MONITOR] Shadow repo changes: ${changes.summary}`));
+      console.log(
+        chalk.gray(`[MONITOR] Shadow repo changes: ${changes.summary}`),
+      );
 
       let diffData = null;
 

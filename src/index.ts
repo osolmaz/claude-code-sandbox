@@ -42,46 +42,69 @@ export class ClaudeSandbox {
       let branchName = "";
       let prFetchRef = "";
       let remoteFetchRef = "";
-      
+
       if (this.config.prNumber) {
         // Get PR branch name from GitHub but don't checkout locally
         console.log(chalk.blue(`Getting PR #${this.config.prNumber} info...`));
         try {
           const { execSync } = require("child_process");
-          
+
           // Get PR info to find the actual branch name
-          const prInfo = execSync(`gh pr view ${this.config.prNumber} --json headRefName`, {
-            encoding: 'utf-8',
-            cwd: process.cwd()
-          });
+          const prInfo = execSync(
+            `gh pr view ${this.config.prNumber} --json headRefName`,
+            {
+              encoding: "utf-8",
+              cwd: process.cwd(),
+            },
+          );
           const prData = JSON.parse(prInfo);
           branchName = prData.headRefName;
           prFetchRef = `pull/${this.config.prNumber}/head:${branchName}`;
-          
-          console.log(chalk.blue(`PR #${this.config.prNumber} uses branch: ${branchName}`));
-          console.log(chalk.blue(`Will setup container with PR branch: ${branchName}`));
+
+          console.log(
+            chalk.blue(
+              `PR #${this.config.prNumber} uses branch: ${branchName}`,
+            ),
+          );
+          console.log(
+            chalk.blue(`Will setup container with PR branch: ${branchName}`),
+          );
         } catch (error) {
-          console.error(chalk.red(`✗ Failed to get PR #${this.config.prNumber} info:`), error);
+          console.error(
+            chalk.red(`✗ Failed to get PR #${this.config.prNumber} info:`),
+            error,
+          );
           throw error;
         }
       } else if (this.config.remoteBranch) {
         // Parse remote branch but don't checkout locally
-        console.log(chalk.blue(`Will setup container with remote branch: ${this.config.remoteBranch}`));
+        console.log(
+          chalk.blue(
+            `Will setup container with remote branch: ${this.config.remoteBranch}`,
+          ),
+        );
         try {
           // Parse remote/branch format
-          const parts = this.config.remoteBranch.split('/');
+          const parts = this.config.remoteBranch.split("/");
           if (parts.length < 2) {
-            throw new Error('Remote branch must be in format "remote/branch" (e.g., "origin/feature-branch")');
+            throw new Error(
+              'Remote branch must be in format "remote/branch" (e.g., "origin/feature-branch")',
+            );
           }
-          
+
           const remote = parts[0];
-          const branch = parts.slice(1).join('/');
-          
+          const branch = parts.slice(1).join("/");
+
           console.log(chalk.blue(`Remote: ${remote}, Branch: ${branch}`));
           branchName = branch;
           remoteFetchRef = `${remote}/${branch}`;
         } catch (error) {
-          console.error(chalk.red(`✗ Failed to parse remote branch ${this.config.remoteBranch}:`), error);
+          console.error(
+            chalk.red(
+              `✗ Failed to parse remote branch ${this.config.remoteBranch}:`,
+            ),
+            error,
+          );
           throw error;
         }
       } else {
@@ -95,7 +118,9 @@ export class ClaudeSandbox {
               .split("T")[0];
             return `claude/${timestamp}-${Date.now()}`;
           })();
-        console.log(chalk.blue(`Will create branch in container: ${branchName}`));
+        console.log(
+          chalk.blue(`Will create branch in container: ${branchName}`),
+        );
       }
 
       // Discover credentials (optional - don't fail if not found)
