@@ -429,6 +429,9 @@ function initSocket() {
     if (term) {
       term.focus();
     }
+
+    // Fetch git info for this container
+    fetchGitInfo();
   });
 
   socket.on("output", (data) => {
@@ -639,6 +642,64 @@ function copySelection() {
   }
 }
 
+// Git info functions
+async function fetchGitInfo() {
+  try {
+    // Use container ID if available to get branch from shadow repo
+    const url = containerId ? `/api/git/info?containerId=${containerId}` : "/api/git/info";
+    const response = await fetch(url);
+    if (response.ok) {
+      const data = await response.json();
+      updateGitInfo(data);
+    } else {
+      console.error("Failed to fetch git info:", response.statusText);
+    }
+  } catch (error) {
+    console.error("Error fetching git info:", error);
+  }
+}
+
+function updateGitInfo(data) {
+  const gitInfoElement = document.getElementById("git-info");
+  const branchNameElement = document.getElementById("branch-name");
+  const prInfoElement = document.getElementById("pr-info");
+
+  if (data.currentBranch) {
+    branchNameElement.textContent = data.currentBranch;
+    gitInfoElement.style.display = "inline-block";
+  }
+
+  // Clear existing PR info
+  prInfoElement.innerHTML = "";
+
+  if (data.prs && data.prs.length > 0) {
+    data.prs.forEach(pr => {
+      const prBadge = document.createElement("a");
+      prBadge.className = "pr-badge";
+      prBadge.href = pr.url;
+      prBadge.target = "_blank";
+      prBadge.title = pr.title;
+      
+      // Set badge class based on state
+      if (pr.isDraft) {
+        prBadge.classList.add("draft");
+        prBadge.textContent = `Draft PR #${pr.number}`;
+      } else if (pr.state === "OPEN") {
+        prBadge.classList.add("open");
+        prBadge.textContent = `PR #${pr.number}`;
+      } else if (pr.state === "CLOSED") {
+        prBadge.classList.add("closed");
+        prBadge.textContent = `Closed PR #${pr.number}`;
+      } else if (pr.state === "MERGED") {
+        prBadge.classList.add("merged");
+        prBadge.textContent = `Merged PR #${pr.number}`;
+      }
+      
+      prInfoElement.appendChild(prBadge);
+    });
+  }
+}
+
 // Initialize everything when DOM is ready
 document.addEventListener("DOMContentLoaded", () => {
   // Store original page title
@@ -646,6 +707,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   initTerminal();
   initSocket();
+  
+  // Fetch git info on load
+  fetchGitInfo();
+  
+  // Refresh git info periodically
+  setInterval(fetchGitInfo, 30000); // Every 30 seconds
 
   // Initialize audio on first user interaction (browser requirement)
   document.addEventListener(

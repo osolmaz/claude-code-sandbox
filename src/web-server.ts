@@ -68,6 +68,61 @@ export class WebUIServer {
         res.status(500).json({ error: "Failed to list containers" });
       }
     });
+
+    // Git info endpoint - get current branch and PRs
+    this.app.get("/api/git/info", async (req, res) => {
+      try {
+        const containerId = req.query.containerId as string;
+        let currentBranch = "loading...";
+        let workingDir = this.originalRepo || process.cwd();
+        
+        // If containerId is provided, try to get branch from shadow repo
+        if (containerId && this.shadowRepos.has(containerId)) {
+          const shadowRepo = this.shadowRepos.get(containerId)!;
+          const shadowPath = shadowRepo.getPath();
+          if (shadowPath) {
+            try {
+              const branchResult = await execAsync("git rev-parse --abbrev-ref HEAD", {
+                cwd: shadowPath,
+              });
+              currentBranch = branchResult.stdout.trim();
+              // Use original repo for PR lookup (PRs are created against the main repo)
+            } catch (error) {
+              console.warn("Could not get branch from shadow repo:", error);
+            }
+          }
+        } else {
+          // Fallback to original repo
+          const branchResult = await execAsync("git rev-parse --abbrev-ref HEAD", {
+            cwd: workingDir,
+          });
+          currentBranch = branchResult.stdout.trim();
+        }
+
+        // Get PR info using GitHub CLI (always use original repo)
+        let prs = [];
+        try {
+          const prResult = await execAsync(
+            `gh pr list --head "${currentBranch}" --json number,title,state,url,isDraft,mergeable`,
+            {
+              cwd: this.originalRepo || process.cwd(),
+            }
+          );
+          prs = JSON.parse(prResult.stdout || "[]");
+        } catch (error) {
+          // GitHub CLI might not be installed or not authenticated
+          console.warn("Could not fetch PR info:", error);
+        }
+
+        res.json({
+          currentBranch,
+          prs,
+        });
+      } catch (error) {
+        console.error("Failed to get git info:", error);
+        res.status(500).json({ error: "Failed to get git info" });
+      }
+    });
   }
 
   private setupSocketHandlers(): void {

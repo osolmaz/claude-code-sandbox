@@ -68,6 +68,17 @@ This is the Claude Code Sandbox project - a CLI tool that runs Claude Code insta
 - Each session creates a new branch (`claude/[timestamp]`)
 - Real-time commit monitoring with interactive review
 
+### Shadow Repository Sync Principles
+
+The shadow repository maintains a real-time sync with the container's workspace using the following principles:
+
+1. **Git-tracked files take precedence**: Any file that is committed to the git repository will be synced to the shadow repo, regardless of whether it matches patterns in `.gitignore`
+2. **Gitignore patterns apply to untracked files**: Files that are not committed to git but match `.gitignore` patterns will be excluded from sync
+3. **Built-in exclusions**: Certain directories (`.git`, `node_modules`, `__pycache__`, etc.) are always excluded for performance and safety
+4. **Rsync rule order**: Include rules for git-tracked files are processed before exclude rules, ensuring committed files are always preserved
+
+This ensures that important data files (like corpora, model files, etc.) that are committed to the repository are never accidentally deleted during sync operations, even if they match common gitignore patterns like `*.zip` or `*.tar.gz`.
+
 ## Configuration
 
 The tool looks for `claude-sandbox.config.json` in the working directory. Key options:

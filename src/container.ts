@@ -497,6 +497,18 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
     const { execSync } = require("child_process");
     const fs = require("fs");
 
+    // Helper function to get tar flags safely
+    const getTarFlags = () => {
+      try {
+        // Test if --no-xattrs is supported by checking tar help
+        execSync("tar --help 2>&1 | grep -q no-xattrs", { stdio: "pipe" });
+        return "--no-xattrs";
+      } catch {
+        // --no-xattrs not supported, use standard tar
+        return "";
+      }
+    };
+
     try {
       // Get list of git-tracked files (including uncommitted changes)
       const trackedFiles = execSync("git ls-files", {
@@ -575,8 +587,9 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
       const gitTarFile = `/tmp/claude-sandbox-git-${Date.now()}.tar`;
       // Exclude macOS resource fork files and .DS_Store when creating git archive
       // Also strip extended attributes to prevent macOS xattr issues in Docker
+      const tarFlags = getTarFlags();
       execSync(
-        `tar -cf "${gitTarFile}" --exclude="._*" --exclude=".DS_Store" --no-xattrs .git`,
+        `tar -cf "${gitTarFile}" --exclude="._*" --exclude=".DS_Store" ${tarFlags} .git`,
         {
           cwd: workDir,
           stdio: "pipe",
@@ -614,6 +627,18 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
     const os = require("os");
     const path = require("path");
     const { execSync } = require("child_process");
+
+    // Helper function to get tar flags safely
+    const getTarFlags = () => {
+      try {
+        // Test if --no-xattrs is supported by checking tar help
+        execSync("tar --help 2>&1 | grep -q no-xattrs", { stdio: "pipe" });
+        return "--no-xattrs";
+      } catch {
+        // --no-xattrs not supported, use standard tar
+        return "";
+      }
+    };
 
     try {
       // First, try to get credentials from macOS Keychain if on Mac
@@ -754,7 +779,8 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
         console.log(chalk.blue("• Copying .claude directory..."));
 
         const tarFile = `/tmp/claude-dir-${Date.now()}.tar`;
-        execSync(`tar -cf "${tarFile}" --no-xattrs -C "${os.homedir()}" .claude`, {
+        const tarFlags = getTarFlags();
+        execSync(`tar -cf "${tarFile}" ${tarFlags} -C "${os.homedir()}" .claude`, {
           stdio: "pipe",
         });
 
