@@ -38,23 +38,16 @@ export class ClaudeSandbox {
       const currentBranch = await this.git.branchLocal();
       console.log(chalk.blue(`Current branch: ${currentBranch.current}`));
 
-      // Determine target branch based on config options
+      // Determine target branch based on config options (but don't checkout in host repo)
       let branchName = "";
+      let prFetchRef = "";
+      let remoteFetchRef = "";
       
       if (this.config.prNumber) {
-        // Checkout PR - get the actual branch name from GitHub
-        console.log(chalk.blue(`Fetching PR #${this.config.prNumber}...`));
+        // Get PR branch name from GitHub but don't checkout locally
+        console.log(chalk.blue(`Getting PR #${this.config.prNumber} info...`));
         try {
           const { execSync } = require("child_process");
-          
-          // Check for uncommitted changes first
-          const status = await this.git.status();
-          if (!status.isClean()) {
-            console.log(chalk.yellow("Warning: You have uncommitted changes. Committing them first..."));
-            await this.git.add("./*");
-            await this.git.commit("Save work before checking out PR");
-            console.log(chalk.green("✓ Committed uncommitted changes"));
-          }
           
           // Get PR info to find the actual branch name
           const prInfo = execSync(`gh pr view ${this.config.prNumber} --json headRefName`, {
@@ -62,41 +55,19 @@ export class ClaudeSandbox {
             cwd: process.cwd()
           });
           const prData = JSON.parse(prInfo);
-          const actualBranchName = prData.headRefName;
+          branchName = prData.headRefName;
+          prFetchRef = `pull/${this.config.prNumber}/head:${branchName}`;
           
-          console.log(chalk.blue(`PR #${this.config.prNumber} uses branch: ${actualBranchName}`));
-          
-          // Fetch the PR
-          await this.git.fetch('origin', `pull/${this.config.prNumber}/head:${actualBranchName}`);
-          
-          // Check if branch exists locally
-          const branches = await this.git.branchLocal();
-          if (branches.all.includes(actualBranchName)) {
-            await this.git.checkout(actualBranchName);
-            console.log(chalk.green(`✓ Switched to existing branch: ${actualBranchName}`));
-          } else {
-            await this.git.checkout(actualBranchName);
-            console.log(chalk.green(`✓ Checked out PR #${this.config.prNumber} as branch: ${actualBranchName}`));
-          }
-          
-          branchName = actualBranchName;
+          console.log(chalk.blue(`PR #${this.config.prNumber} uses branch: ${branchName}`));
+          console.log(chalk.blue(`Will setup container with PR branch: ${branchName}`));
         } catch (error) {
-          console.error(chalk.red(`✗ Failed to checkout PR #${this.config.prNumber}:`), error);
+          console.error(chalk.red(`✗ Failed to get PR #${this.config.prNumber} info:`), error);
           throw error;
         }
       } else if (this.config.remoteBranch) {
-        // Checkout remote branch
-        console.log(chalk.blue(`Checking out remote branch: ${this.config.remoteBranch}...`));
+        // Parse remote branch but don't checkout locally
+        console.log(chalk.blue(`Will setup container with remote branch: ${this.config.remoteBranch}`));
         try {
-          // Check for uncommitted changes first
-          const status = await this.git.status();
-          if (!status.isClean()) {
-            console.log(chalk.yellow("Warning: You have uncommitted changes. Committing them first..."));
-            await this.git.add("./*");
-            await this.git.commit("Save work before checking out remote branch");
-            console.log(chalk.green("✓ Committed uncommitted changes"));
-          }
-          
           // Parse remote/branch format
           const parts = this.config.remoteBranch.split('/');
           if (parts.length < 2) {
@@ -107,26 +78,10 @@ export class ClaudeSandbox {
           const branch = parts.slice(1).join('/');
           
           console.log(chalk.blue(`Remote: ${remote}, Branch: ${branch}`));
-          
-          // Fetch from remote
-          await this.git.fetch(remote);
-          
-          // Check if local branch exists
-          const branches = await this.git.branchLocal();
-          if (branches.all.includes(branch)) {
-            // Local branch exists, switch to it and pull
-            await this.git.checkout(branch);
-            await this.git.pull(remote, branch);
-            console.log(chalk.green(`✓ Switched to existing local branch: ${branch}`));
-          } else {
-            // Create new local branch tracking the remote
-            await this.git.checkoutBranch(branch, `${remote}/${branch}`);
-            console.log(chalk.green(`✓ Created and checked out new branch: ${branch} tracking ${remote}/${branch}`));
-          }
-          
           branchName = branch;
+          remoteFetchRef = `${remote}/${branch}`;
         } catch (error) {
-          console.error(chalk.red(`✗ Failed to checkout remote branch ${this.config.remoteBranch}:`), error);
+          console.error(chalk.red(`✗ Failed to parse remote branch ${this.config.remoteBranch}:`), error);
           throw error;
         }
       } else {
@@ -150,6 +105,8 @@ export class ClaudeSandbox {
       const containerConfig = await this.prepareContainer(
         branchName,
         credentials,
+        prFetchRef,
+        remoteFetchRef,
       );
 
       // Start container
@@ -203,6 +160,8 @@ export class ClaudeSandbox {
   private async prepareContainer(
     branchName: string,
     credentials: any,
+    prFetchRef?: string,
+    remoteFetchRef?: string,
   ): Promise<any> {
     const workDir = process.cwd();
     const repoName = path.basename(workDir);
@@ -213,6 +172,8 @@ export class ClaudeSandbox {
       workDir,
       repoName,
       dockerImage: this.config.dockerImage || "claude-sandbox:latest",
+      prFetchRef,
+      remoteFetchRef,
     };
   }
 
