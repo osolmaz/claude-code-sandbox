@@ -453,6 +453,7 @@ export class WebUIServer {
 
     try {
       // Initialize shadow repo if not exists
+      let isNewShadowRepo = false;
       if (!this.shadowRepos.has(containerId)) {
         const shadowRepo = new ShadowRepository({
           originalRepo: this.originalRepo || process.cwd(),
@@ -460,11 +461,33 @@ export class WebUIServer {
           sessionId: containerId.substring(0, 12),
         });
         this.shadowRepos.set(containerId, shadowRepo);
+        isNewShadowRepo = true;
+        
+        // Reset shadow repo to match container's branch (important for PR/remote branch scenarios)
+        await shadowRepo.resetToContainerBranch(containerId);
       }
 
       // Sync files from container (inotify already told us there are changes)
       const shadowRepo = this.shadowRepos.get(containerId)!;
       await shadowRepo.syncFromContainer(containerId);
+      
+      // If this is a new shadow repo, establish a clean baseline after the first sync
+      if (isNewShadowRepo) {
+        console.log(chalk.blue("🔄 Establishing clean baseline for new shadow repo..."));
+        const shadowPath = shadowRepo.getPath();
+        
+        try {
+          // Stage all synced files and create a baseline commit
+          await execAsync("git add -A", { cwd: shadowPath });
+          await execAsync('git commit -m "Establish baseline from container content" --allow-empty', { cwd: shadowPath });
+          console.log(chalk.green("✓ Clean baseline established"));
+          
+          // Now do one more sync to see if there are any actual changes
+          await shadowRepo.syncFromContainer(containerId);
+        } catch (baselineError) {
+          console.warn(chalk.yellow("Warning: Could not establish baseline"), baselineError);
+        }
+      }
 
       // Check if shadow repo actually has git initialized
       const shadowPath = shadowRepo.getPath();
@@ -481,7 +504,7 @@ export class WebUIServer {
 
       // Get changes summary and diff data
       const changes = await shadowRepo.getChanges();
-      console.log(chalk.gray(`[MONITOR] Shadow repo changes:`, changes));
+      console.log(chalk.gray(`[MONITOR] Shadow repo changes: ${changes.summary}`));
 
       let diffData = null;
 
