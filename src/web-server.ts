@@ -99,6 +99,24 @@ export class WebUIServer {
           currentBranch = branchResult.stdout.trim();
         }
 
+        // Get repository remote URL for branch links
+        let repoUrl = "";
+        try {
+          const remoteResult = await execAsync("git remote get-url origin", {
+            cwd: this.originalRepo || process.cwd(),
+          });
+          const remoteUrl = remoteResult.stdout.trim();
+          
+          // Convert SSH URLs to HTTPS for web links
+          if (remoteUrl.startsWith("git@github.com:")) {
+            repoUrl = remoteUrl.replace("git@github.com:", "https://github.com/").replace(".git", "");
+          } else if (remoteUrl.startsWith("https://")) {
+            repoUrl = remoteUrl.replace(".git", "");
+          }
+        } catch (error) {
+          console.warn("Could not get repository URL:", error);
+        }
+
         // Get PR info using GitHub CLI (always use original repo)
         let prs = [];
         try {
@@ -114,8 +132,12 @@ export class WebUIServer {
           console.warn("Could not fetch PR info:", error);
         }
 
+        const branchUrl = repoUrl ? `${repoUrl}/tree/${currentBranch}` : "";
+
         res.json({
           currentBranch,
+          branchUrl,
+          repoUrl,
           prs,
         });
       } catch (error) {

@@ -665,7 +665,30 @@ function updateGitInfo(data) {
   const prInfoElement = document.getElementById("pr-info");
 
   if (data.currentBranch) {
-    branchNameElement.textContent = data.currentBranch;
+    // Clear existing content
+    branchNameElement.innerHTML = "";
+    
+    if (data.branchUrl) {
+      // Create clickable branch link
+      const branchLink = document.createElement("a");
+      branchLink.href = data.branchUrl;
+      branchLink.target = "_blank";
+      branchLink.textContent = data.currentBranch;
+      branchLink.style.color = "inherit";
+      branchLink.style.textDecoration = "none";
+      branchLink.title = `View ${data.currentBranch} branch on GitHub`;
+      branchLink.addEventListener("mouseenter", () => {
+        branchLink.style.textDecoration = "underline";
+      });
+      branchLink.addEventListener("mouseleave", () => {
+        branchLink.style.textDecoration = "none";
+      });
+      branchNameElement.appendChild(branchLink);
+    } else {
+      // Fallback to plain text
+      branchNameElement.textContent = data.currentBranch;
+    }
+    
     gitInfoElement.style.display = "inline-block";
   }
 

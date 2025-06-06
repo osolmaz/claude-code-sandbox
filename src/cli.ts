@@ -80,7 +80,7 @@ program
   )
   .option("-n, --name <name>", "Container name prefix")
   .option("--no-push", "Disable automatic branch pushing")
-  .option("--no-pr", "Disable automatic PR creation")
+  .option("--no-create-pr", "Disable automatic PR creation")
   .option(
     "--include-untracked",
     "Include untracked files when copying to container",
@@ -88,6 +88,14 @@ program
   .option(
     "-b, --branch <branch>",
     "Switch to specific branch on container start (creates if doesn't exist)",
+  )
+  .option(
+    "--remote-branch <branch>",
+    "Checkout a remote branch (e.g., origin/feature-branch)",
+  )
+  .option(
+    "--pr <number>",
+    "Checkout a specific PR by number",
   )
   .option(
     "--shell <shell>",
@@ -100,9 +108,11 @@ program
     const config = await loadConfig(options.config);
     config.containerPrefix = options.name || config.containerPrefix;
     config.autoPush = options.push !== false;
-    config.autoCreatePR = options.pr !== false;
+    config.autoCreatePR = options.createPr !== false;
     config.includeUntracked = options.includeUntracked || false;
     config.targetBranch = options.branch;
+    config.remoteBranch = options.remoteBranch;
+    config.prNumber = options.pr;
     if (options.shell) {
       config.defaultShell = options.shell.toLowerCase();
     }

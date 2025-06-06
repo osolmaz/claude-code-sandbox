@@ -23,6 +23,8 @@ export interface SandboxConfig {
   bashTimeout?: number;
   includeUntracked?: boolean;
   targetBranch?: string;
+  remoteBranch?: string;
+  prNumber?: string;
 }
 
 export interface Credentials {

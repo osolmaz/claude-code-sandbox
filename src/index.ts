@@ -38,17 +38,67 @@ export class ClaudeSandbox {
       const currentBranch = await this.git.branchLocal();
       console.log(chalk.blue(`Current branch: ${currentBranch.current}`));
 
-      // Use target branch from config or generate one
-      const branchName =
-        this.config.targetBranch ||
-        (() => {
-          const timestamp = new Date()
-            .toISOString()
-            .replace(/[:.]/g, "-")
-            .split("T")[0];
-          return `claude/${timestamp}-${Date.now()}`;
-        })();
-      console.log(chalk.blue(`Will create branch in container: ${branchName}`));
+      // Determine target branch based on config options
+      let branchName = "";
+      
+      if (this.config.prNumber) {
+        // Checkout PR
+        console.log(chalk.blue(`Fetching PR #${this.config.prNumber}...`));
+        try {
+          branchName = `pr-${this.config.prNumber}`;
+          
+          // Check if PR branch already exists locally
+          const branches = await this.git.branchLocal();
+          if (branches.all.includes(branchName)) {
+            // PR branch exists, just checkout
+            await this.git.checkout(branchName);
+            console.log(chalk.green(`✓ Switched to existing PR branch: ${branchName}`));
+          } else {
+            // Fetch and create new PR branch
+            await this.git.fetch("origin", `pull/${this.config.prNumber}/head:${branchName}`);
+            await this.git.checkout(branchName);
+            console.log(chalk.green(`✓ Checked out PR #${this.config.prNumber}`));
+          }
+        } catch (error) {
+          console.error(chalk.red(`✗ Failed to checkout PR #${this.config.prNumber}:`), error);
+          throw error;
+        }
+      } else if (this.config.remoteBranch) {
+        // Checkout remote branch
+        console.log(chalk.blue(`Checking out remote branch: ${this.config.remoteBranch}...`));
+        try {
+          await this.git.fetch("origin");
+          const localBranchName = this.config.remoteBranch.replace("origin/", "");
+          
+          // Check if local branch already exists
+          const branches = await this.git.branchLocal();
+          if (branches.all.includes(localBranchName)) {
+            // Local branch exists, just checkout
+            await this.git.checkout(localBranchName);
+            console.log(chalk.green(`✓ Switched to existing branch: ${localBranchName}`));
+          } else {
+            // Create new local branch from remote
+            await this.git.checkoutBranch(localBranchName, this.config.remoteBranch);
+            console.log(chalk.green(`✓ Checked out remote branch: ${this.config.remoteBranch}`));
+          }
+          branchName = localBranchName;
+        } catch (error) {
+          console.error(chalk.red(`✗ Failed to checkout remote branch ${this.config.remoteBranch}:`), error);
+          throw error;
+        }
+      } else {
+        // Use target branch from config or generate one
+        branchName =
+          this.config.targetBranch ||
+          (() => {
+            const timestamp = new Date()
+              .toISOString()
+              .replace(/[:.]/g, "-")
+              .split("T")[0];
+            return `claude/${timestamp}-${Date.now()}`;
+          })();
+        console.log(chalk.blue(`Will create branch in container: ${branchName}`));
+      }
 
       // Discover credentials (optional - don't fail if not found)
       const credentials = await this.credentialManager.discover();
