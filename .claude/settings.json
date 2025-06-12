@@ -34,7 +34,11 @@
       "Bash(npm start:*)",
       "Bash(npm run purge-containers:*)",
       "Bash(claude-sandbox start:*)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(npx eslint:*)",
+      "Bash(npm test:*)",
+      "Bash(gh issue view:*)",
+      "Bash(npm install)"
     ],
     "deny": []
   },
