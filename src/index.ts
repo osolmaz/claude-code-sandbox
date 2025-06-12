@@ -7,6 +7,7 @@ import { ContainerManager } from "./container";
 import { UIManager } from "./ui";
 import { WebUIServer } from "./web-server";
 import { SandboxConfig } from "./types";
+import { getDockerConfig, isPodman } from "./docker-config";
 import path from "path";
 
 export class ClaudeSandbox {
@@ -21,7 +22,14 @@ export class ClaudeSandbox {
 
   constructor(config: SandboxConfig) {
     this.config = config;
-    this.docker = new Docker();
+    const dockerConfig = getDockerConfig(config.dockerSocketPath);
+    this.docker = new Docker(dockerConfig);
+
+    // Log if using Podman
+    if (isPodman(dockerConfig)) {
+      console.log(chalk.blue("Detected Podman socket"));
+    }
+
     this.git = simpleGit();
     this.credentialManager = new CredentialManager();
     this.gitMonitor = new GitMonitor(this.git);

@@ -27,5 +27,6 @@
   "maxThinkingTokens": 100000,
   "bashTimeout": 600000,
   "containerPrefix": "claude-code-sandbox",
-  "claudeConfigPath": "~/.claude.json"
+  "claudeConfigPath": "~/.claude.json",
+  "dockerSocketPath": null
 }

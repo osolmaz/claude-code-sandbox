@@ -44,7 +44,7 @@ npm install -g @textcortex/claude-code-sandbox
 ### Prerequisites
 
 - Node.js >= 18.0.0
-- Docker
+- Docker or Podman
 - Git
 - Claude Code (`npm install -g @anthropic-ai/claude-code@latest`)
 
@@ -218,6 +218,7 @@ Create a `claude-sandbox.config.json` file (see `claude-sandbox.config.example.j
 - `bashTimeout`: Timeout for bash commands in milliseconds
 - `containerPrefix`: Custom prefix for container names
 - `claudeConfigPath`: Path to Claude configuration file
+- `dockerSocketPath`: Custom Docker/Podman socket path (auto-detected by default)
 
 #### Mount Configuration
 
@@ -235,6 +236,27 @@ Example use cases:
 - Access host system resources (use with caution)
 
 ## Features
+
+### Podman Support
+
+Claude Code Sandbox now supports Podman as an alternative to Docker. The tool automatically detects whether you're using Docker or Podman by checking for available socket paths:
+
+- **Automatic detection**: The tool checks for Docker and Podman sockets in standard locations
+- **Custom socket paths**: Use the `dockerSocketPath` configuration option to specify a custom socket
+- **Environment variable**: Set `DOCKER_HOST` to override socket detection
+
+Example configuration for Podman:
+
+```json
+{
+  "dockerSocketPath": "/run/user/1000/podman/podman.sock"
+}
+```
+
+The tool will automatically detect and use Podman if:
+
+- Docker socket is not available
+- Podman socket is found at standard locations (`/run/podman/podman.sock` or `$XDG_RUNTIME_DIR/podman/podman.sock`)
 
 ### Web UI Terminal
 

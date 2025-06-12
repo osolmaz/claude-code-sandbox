@@ -6,10 +6,36 @@ import Docker from "dockerode";
 import { ClaudeSandbox } from "./index";
 import { loadConfig } from "./config";
 import { WebUIServer } from "./web-server";
+import { getDockerConfig, isPodman } from "./docker-config";
 import ora from "ora";
 
-const docker = new Docker();
+// Initialize Docker with config - will be updated after loading config if needed
+let dockerConfig = getDockerConfig();
+let docker = new Docker(dockerConfig);
 const program = new Command();
+
+// Helper function to reinitialize Docker with custom socket path
+function reinitializeDocker(socketPath?: string) {
+  if (socketPath) {
+    dockerConfig = getDockerConfig(socketPath);
+    docker = new Docker(dockerConfig);
+
+    // Log if using Podman
+    if (isPodman(dockerConfig)) {
+      console.log(chalk.blue("Detected Podman socket"));
+    }
+  }
+}
+
+// Helper to ensure Docker is initialized with config
+async function ensureDockerConfig() {
+  try {
+    const config = await loadConfig("./claude-sandbox.config.json");
+    reinitializeDocker(config.dockerSocketPath);
+  } catch (error) {
+    // Config loading failed, continue with default Docker config
+  }
+}
 
 // Helper function to get Claude Sandbox containers
 async function getClaudeSandboxContainers() {
@@ -123,6 +149,7 @@ program
   .command("attach [container-id]")
   .description("Attach to an existing Claude Sandbox container")
   .action(async (containerId) => {
+    await ensureDockerConfig();
     const spinner = ora("Looking for containers...").start();
 
     try {
@@ -169,6 +196,7 @@ program
   .description("List all Claude Sandbox containers")
   .option("-a, --all", "Show all containers (including stopped)")
   .action(async (options) => {
+    await ensureDockerConfig();
     const spinner = ora("Fetching containers...").start();
 
     try {
@@ -211,6 +239,7 @@ program
   .description("Stop Claude Sandbox container(s)")
   .option("-a, --all", "Stop all Claude Sandbox containers")
   .action(async (containerId, options) => {
+    await ensureDockerConfig();
     const spinner = ora("Stopping containers...").start();
 
     try {
@@ -272,6 +301,7 @@ program
   .option("-n, --tail <lines>", "Number of lines to show from the end", "50")
   .action(async (containerId, options) => {
     try {
+      await ensureDockerConfig();
       let targetContainerId = containerId;
 
       if (!targetContainerId) {
@@ -310,6 +340,7 @@ program
   .description("Remove all stopped Claude Sandbox containers")
   .option("-f, --force", "Remove all containers (including running)")
   .action(async (options) => {
+    await ensureDockerConfig();
     const spinner = ora("Cleaning up containers...").start();
 
     try {
@@ -346,6 +377,7 @@ program
   .option("-y, --yes", "Skip confirmation prompt")
   .action(async (options) => {
     try {
+      await ensureDockerConfig();
       const containers = await getClaudeSandboxContainers();
 
       if (containers.length === 0) {
